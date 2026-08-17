@@ -124,6 +124,15 @@ pub async fn ai_chat(
             &params.user_message,
             &s.memory.embeddings,
         );
+
+        // v0.6: Auto-extract entities from the latest user message and
+        // persist any new facts to the knowledge base. Best-effort.
+        let texts = vec![params.user_message.clone()];
+        match crate::memory::entities::extract_and_store(&s.memory, &texts) {
+            Ok(n) if n > 0 => tracing::info!("extracted {n} new entities from user message"),
+            Ok(_) => {}
+            Err(e) => tracing::warn!("entity extraction failed: {e}"),
+        }
     }
 
     let req = ChatRequest {
@@ -241,6 +250,14 @@ pub async fn ai_chat_stream(
             &params.user_message,
             &s.memory.embeddings,
         );
+
+        // v0.6: Auto-extract entities from the latest user message.
+        let texts = vec![params.user_message.clone()];
+        match crate::memory::entities::extract_and_store(&s.memory, &texts) {
+            Ok(n) if n > 0 => tracing::info!("extracted {n} new entities from user message"),
+            Ok(_) => {}
+            Err(e) => tracing::warn!("entity extraction failed: {e}"),
+        }
     }
 
     // Generate stream ID and create cancel token
@@ -1485,4 +1502,265 @@ fn _force_use(
     _cl: ClipboardContent,
     _pa: PendingAction,
 ) {
+}
+
+// ===========================================================================
+// v0.6 — Web access (real web_search + http_fetch readability)
+// ===========================================================================
+
+/// Run a real web search via DuckDuckGo's HTML endpoint. No API key needed.
+/// Returns up to 8 hits with title, URL, and snippet.
+#[tauri::command]
+pub async fn web_search(query: String) -> Result<Vec<crate::ai::web::SearchResult>> {
+    crate::ai::web::web_search(&query).await
+}
+
+/// Fetch a URL and return its readable text (HTML boilerplate stripped).
+/// Caps the response at 32 KB. Useful for ingesting articles / docs.
+#[tauri::command]
+pub async fn web_fetch(url: String) -> Result<String> {
+    crate::ai::web::fetch_readable(&url).await
+}
+
+/// Fetch a URL and return raw HTML/JSON (no readability extraction).
+/// Caps the response at 256 KB. Use this for JSON APIs or raw downloads.
+#[tauri::command]
+pub async fn web_fetch_raw(
+    url: String,
+    method: Option<String>,
+    body: Option<String>,
+) -> Result<serde_json::Value> {
+    let method = method.unwrap_or_else(|| "GET".into());
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| AegisError::Internal(format!("http client build failed: {e}")))?;
+    let m = reqwest::Method::from_bytes(method.as_bytes())
+        .map_err(|e| AegisError::Config(format!("invalid method '{method}': {e}")))?;
+    let mut req = client.request(m, &url);
+    if let Some(b) = body {
+        req = req.body(b);
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| AegisError::Ai(format!("http fetch failed: {e}")))?;
+    let status = resp.status().as_u16();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| AegisError::Ai(format!("http fetch body read failed: {e}")))?;
+    let len = text.len();
+    let truncated = if len > 256 * 1024 {
+        let mut t = text[..256 * 1024].to_string();
+        t.push_str("\n...[truncated]");
+        t
+    } else {
+        text
+    };
+    Ok(serde_json::json!({
+        "status": status,
+        "body": truncated,
+        "len": len,
+        "url": url,
+    }))
+}
+
+// ===========================================================================
+// v0.6 — Memory: entity extraction
+// ===========================================================================
+
+/// Run entity extraction over the last N messages of a conversation and
+/// persist any new entities to the knowledge base. Returns the count of
+/// new facts stored.
+#[tauri::command]
+pub fn memory_extract_entities(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    conversation_id: String,
+    limit: Option<u32>,
+) -> Result<usize> {
+    let s = state.lock();
+    let messages = s.memory.conversations.messages(&conversation_id)?;
+    let limit = limit.unwrap_or(50) as usize;
+    let texts: Vec<String> = messages
+        .into_iter()
+        .rev()
+        .take(limit)
+        .map(|m| m.content)
+        .collect();
+    let n = crate::memory::entities::extract_and_store(&s.memory, &texts)?;
+    if n > 0 {
+        tracing::info!("extracted {n} new entities from conversation {conversation_id}");
+    }
+    Ok(n)
+}
+
+/// Return the database encryption status (Phase 2.5 stub).
+#[tauri::command]
+pub fn memory_encryption_status() -> serde_json::Value {
+    let status = crate::memory::encryption::status();
+    serde_json::json!({
+        "status": match status {
+            crate::memory::EncryptionStatus::NotSupported => "not_supported",
+            crate::memory::EncryptionStatus::Disabled => "disabled",
+            crate::memory::EncryptionStatus::Enabled => "enabled",
+        },
+        "supported": crate::memory::encryption::is_supported(),
+    })
+}
+
+// ===========================================================================
+// v0.6 — Security: YARA rules + audit log export
+// ===========================================================================
+
+/// Return the list of loaded YARA rules. Empty if the user hasn't dropped
+/// any `.yar` / `.yara` files into their data directory.
+#[tauri::command]
+pub fn yara_list() -> Result<Vec<crate::security::yara::YaraRule>> {
+    crate::security::yara::load_all()
+}
+
+/// Ensure the YARA rules directory exists. Called at boot so the user can
+/// drop rule files into it without manually creating the directory.
+#[tauri::command]
+pub fn yara_ensure_dir() -> Result<()> {
+    crate::security::yara::ensure_dir()
+}
+
+/// Export the audit log as JSON (Phase 4.3 — GDPR data export).
+/// Returns the last N entries as a JSON array. The frontend can save the
+/// result to a file via the Tauri `dialog` plugin.
+#[tauri::command]
+pub fn audit_export(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    limit: Option<u32>,
+    format: Option<String>,
+) -> Result<serde_json::Value> {
+    let s = state.lock();
+    let conn = s.memory.shared_conn();
+    let conn = conn.lock();
+    let limit = limit.unwrap_or(10_000);
+    let entries = crate::computer::audit::recent(&conn, limit)?;
+    match format.as_deref().unwrap_or("json") {
+        "json" => Ok(serde_json::to_value(&entries)?),
+        "csv" => {
+            let mut wtr = csv_writer();
+            for e in &entries {
+                let _ = wtr.write_record(&[
+                    e.id.to_string(),
+                    e.ts_ms.to_string(),
+                    e.conversation_id.clone().unwrap_or_default(),
+                    e.agent_run_id.clone().unwrap_or_default(),
+                    e.tool_name.clone(),
+                    e.arguments_json.clone(),
+                    e.result_json.clone(),
+                    e.outcome.clone(),
+                    e.duration_ms.to_string(),
+                ]);
+            }
+            Ok(serde_json::json!({
+                "format": "csv",
+                "rows": entries.len(),
+                "csv": wtr.to_string(),
+            }))
+        }
+        _ => Err(AegisError::Config(format!("unknown export format: {format:?}"))),
+    }
+}
+
+/// Export all conversations + messages as a single JSON document. This is
+/// the "GDPR data export" endpoint (Phase 4.3) — the user can request a
+/// full dump of their data for portability or deletion review.
+#[tauri::command]
+pub fn memory_export_all(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<serde_json::Value> {
+    let s = state.lock();
+    let convs = s.memory.conversations.list(100_000)?;
+    let mut out = Vec::with_capacity(convs.len());
+    for c in &convs {
+        let msgs = s.memory.conversations.messages(&c.id)?;
+        out.push(serde_json::json!({
+            "conversation": c,
+            "messages": msgs,
+        }));
+    }
+    Ok(serde_json::json!({
+        "exported_at_ms": time::OffsetDateTime::now_utc().unix_timestamp() as i64 * 1000,
+        "version": env!("CARGO_PKG_VERSION"),
+        "conversation_count": convs.len(),
+        "data": out,
+    }))
+}
+
+/// Wipe all user data (GDPR "right to be forgotten"). Drops conversations,
+/// activities, knowledge, embeddings, audit log, and integrity baselines.
+/// Settings and provider credentials are NOT wiped (use the Providers UI).
+#[tauri::command]
+pub fn memory_forget_all(state: State<'_, Arc<Mutex<AppState>>>) -> Result<()> {
+    let s = state.lock();
+    let conn = s.memory.shared_conn();
+    let conn = conn.lock();
+    conn.execute_batch(
+        "DELETE FROM messages;
+         DELETE FROM conversations;
+         DELETE FROM activities;
+         DELETE FROM knowledge;
+         DELETE FROM knowledge_embeddings;
+         DELETE FROM events;
+         DELETE FROM integrity_baselines;
+         DELETE FROM audit_log;",
+    )?;
+    tracing::info!("all user data wiped (memory_forget_all)");
+    Ok(())
+}
+
+// ===========================================================================
+// v0.6 — Mobile companion capabilities
+// ===========================================================================
+
+/// Return the mobile companion capabilities (Phase 3.5). Used by the
+/// (future) pairing handshake over the local relay.
+#[tauri::command]
+pub fn mobile_capabilities() -> serde_json::Value {
+    let caps = crate::mobile::capabilities();
+    serde_json::to_value(&caps).unwrap_or_else(|_| serde_json::json!({}))
+}
+
+/// Tiny CSV writer — avoids pulling in the `csv` crate for one endpoint.
+fn csv_writer() -> CsvWriter {
+    CsvWriter::default()
+}
+
+#[derive(Default)]
+struct CsvWriter {
+    buf: String,
+}
+
+impl CsvWriter {
+    fn write_record(&mut self, fields: &[String]) -> std::io::Result<()> {
+        let mut row = String::new();
+        for (i, f) in fields.iter().enumerate() {
+            if i > 0 {
+                row.push(',');
+            }
+            let needs_quote = f.contains(',') || f.contains('"') || f.contains('\n');
+            if needs_quote {
+                row.push('"');
+                row.push_str(&f.replace('"', "\"\""));
+                row.push('"');
+            } else {
+                row.push_str(f);
+            }
+        }
+        row.push('\n');
+        self.buf.push_str(&row);
+        Ok(())
+    }
+}
+
+impl CsvWriter {
+    fn to_string(&self) -> String {
+        self.buf.clone()
+    }
 }

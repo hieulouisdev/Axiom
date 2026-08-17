@@ -28,6 +28,7 @@ pub mod config;
 pub mod error;
 pub mod i18n;
 pub mod memory;
+pub mod mobile;
 pub mod modes;
 pub mod security;
 pub mod state;
@@ -165,6 +166,21 @@ pub fn run() {
             commands::calendar_list_today,
             commands::calendar_configure,
             commands::calendar_dispatch_intent,
+            // ===== v0.6 — Web access (real web_search + readability fetch) =====
+            commands::web_search,
+            commands::web_fetch,
+            commands::web_fetch_raw,
+            // ===== v0.6 — Memory: entity extraction + encryption status =====
+            commands::memory_extract_entities,
+            commands::memory_encryption_status,
+            commands::memory_export_all,
+            commands::memory_forget_all,
+            // ===== v0.6 — Security: YARA rules + audit export =====
+            commands::yara_list,
+            commands::yara_ensure_dir,
+            commands::audit_export,
+            // ===== v0.6 — Mobile companion capabilities =====
+            commands::mobile_capabilities,
             // ===== Computer use =====
             commands::computer_exec_command,
             commands::computer_open_app,

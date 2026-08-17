@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Send, Plus, AlertTriangle, Loader2, Square } from "lucide-react";
+import { Send, Plus, AlertTriangle, Loader2, Square, Copy, Check, Sparkles } from "lucide-react";
 import { useStore } from "../store";
 import { t } from "../i18n";
-import { aiChat, aiChatStream, aiChatCancel, memoryGetConversation } from "../lib/tauri";
+import { aiChat, aiChatStream, aiChatCancel } from "../lib/tauri";
 import { listen } from "@tauri-apps/api/event";
-import type { Message } from "../types";
+import { Markdown } from "./Markdown";
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -21,11 +21,20 @@ export function Chat() {
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const unlistenRefs = useRef<Function[]>([]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  }, [input]);
 
   // Set up event listeners for streaming
   useEffect(() => {
@@ -152,11 +161,15 @@ export function Chat() {
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-aegis-200 bg-white">
+      <header className="aegis-section-header">
         <div>
-          <h2 className="text-lg font-semibold text-aegis-900">{t("nav.chat")}</h2>
-          <p className="text-xs text-aegis-500">
-            {conversationId ? `Conversation: ${conversationId.slice(0, 8)}…` : t("app.tagline")}
+          <h2 className="text-lg font-semibold text-aegis-900 dark:text-aegis-100">
+            {t("nav.chat")}
+          </h2>
+          <p className="text-xs text-aegis-500 dark:text-aegis-400 mt-0.5">
+            {conversationId
+              ? `Conversation: ${conversationId.slice(0, 8)}…`
+              : t("app.tagline")}
           </p>
         </div>
         <button onClick={newConversation} className="aegis-btn">
@@ -174,9 +187,14 @@ export function Chat() {
               <Bubble key={i} message={m} />
             ))}
             {loading && !streaming && (
-              <div className="flex items-center gap-2 text-sm text-aegis-500 px-2">
+              <div className="flex items-center gap-2 text-sm text-aegis-500 dark:text-aegis-400 px-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 {t("chat.thinking")}
+                <span className="inline-flex gap-1">
+                  <span className="h-1 w-1 rounded-full bg-aegis-accent animate-pulse-soft" />
+                  <span className="h-1 w-1 rounded-full bg-aegis-accent animate-pulse-soft" style={{ animationDelay: "0.2s" }} />
+                  <span className="h-1 w-1 rounded-full bg-aegis-accent animate-pulse-soft" style={{ animationDelay: "0.4s" }} />
+                </span>
               </div>
             )}
           </div>
@@ -184,15 +202,16 @@ export function Chat() {
       </div>
 
       {error && (
-        <div className="mx-6 mb-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-start gap-2">
+        <div className="mx-6 mb-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300 text-sm flex items-start gap-2 animate-slide-up">
           <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
       )}
 
       <div className="px-6 pb-4">
-        <div className="max-w-3xl mx-auto flex items-end gap-2 bg-white border border-aegis-200 rounded-xl p-2 shadow-card focus-within:ring-2 focus-within:ring-aegis-accent/20">
+        <div className="max-w-3xl mx-auto flex items-end gap-2 bg-white dark:bg-aegis-night-100 border border-aegis-200 dark:border-aegis-night-50 rounded-xl p-2 shadow-card focus-within:ring-2 focus-within:ring-aegis-accent/20 focus-within:border-aegis-accent transition-all">
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -203,12 +222,12 @@ export function Chat() {
             }}
             placeholder={t("chat.placeholder")}
             rows={1}
-            className="flex-1 resize-none px-2 py-1.5 text-sm bg-transparent focus:outline-none placeholder:text-aegis-400 max-h-40"
+            className="flex-1 resize-none px-2 py-1.5 text-sm bg-transparent focus:outline-none placeholder:text-aegis-400 dark:placeholder:text-aegis-500 text-aegis-800 dark:text-aegis-100 max-h-40"
           />
           {streaming ? (
             <button
               onClick={stopGeneration}
-              className="aegis-btn !bg-red-500 !text-white !p-2 hover:!bg-red-600"
+              className="aegis-btn-danger !p-2"
               aria-label="Stop generation"
             >
               <Square className="h-4 w-4" />
@@ -224,8 +243,8 @@ export function Chat() {
             </button>
           )}
         </div>
-        <p className="text-[11px] text-aegis-400 mt-1.5 text-center">
-          Press Enter to send · Shift+Enter for newline
+        <p className="text-[11px] text-aegis-400 dark:text-aegis-500 mt-1.5 text-center">
+          Press Enter to send · Shift+Enter for newline · AI can search the web & use tools
         </p>
       </div>
     </div>
@@ -234,32 +253,78 @@ export function Chat() {
 
 function EmptyState() {
   return (
-    <div className="h-full flex flex-col items-center justify-center text-center px-6">
-      <div className="h-14 w-14 rounded-2xl bg-aegis-100 flex items-center justify-center mb-4">
-        <Send className="h-6 w-6 text-aegis-400" />
+    <div className="h-full flex flex-col items-center justify-center text-center px-6 animate-fade-in">
+      <div className="relative mb-6">
+        <div className="absolute inset-0 bg-gradient-accent blur-2xl opacity-20 rounded-full" />
+        <div className="relative h-16 w-16 rounded-2xl bg-gradient-accent flex items-center justify-center shadow-glow animate-bounce-in">
+          <Sparkles className="h-7 w-7 text-white" />
+        </div>
       </div>
-      <h3 className="text-base font-semibold text-aegis-900 mb-1">{t("chat.empty.title")}</h3>
-      <p className="text-sm text-aegis-500 max-w-sm">{t("chat.empty.subtitle")}</p>
+      <h3 className="text-xl font-semibold text-aegis-900 dark:text-aegis-100 mb-2">
+        {t("chat.empty.title")}
+      </h3>
+      <p className="text-sm text-aegis-500 dark:text-aegis-400 max-w-md mb-6">
+        {t("chat.empty.subtitle")}
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-2xl w-full">
+        <FeaturePill text={t("chat.empty.feature1")} />
+        <FeaturePill text={t("chat.empty.feature2")} />
+        <FeaturePill text={t("chat.empty.feature3")} />
+      </div>
+    </div>
+  );
+}
+
+function FeaturePill({ text }: { text: string }) {
+  return (
+    <div className="px-3 py-2 rounded-lg bg-aegis-50 dark:bg-aegis-night-100 border border-aegis-200 dark:border-aegis-night-50 text-xs text-aegis-700 dark:text-aegis-300">
+      {text}
     </div>
   );
 }
 
 function Bubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard?.writeText(message.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} animate-fade-in`}>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"} animate-slide-up group`}>
       <div
-        className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
+        className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words
           ${
             isUser
-              ? "bg-aegis-accent text-white rounded-br-sm"
-              : "bg-white border border-aegis-200 text-aegis-800 rounded-bl-sm shadow-card"
+              ? "bg-gradient-accent text-white rounded-br-sm shadow-soft"
+              : "bg-white dark:bg-aegis-night-100 border border-aegis-200 dark:border-aegis-night-50 text-aegis-800 dark:text-aegis-200 rounded-bl-sm shadow-card"
           }`}
       >
-        {message.content}
-        {message.model && !isUser && (
-          <div className="mt-1.5 text-[10px] opacity-60">{message.model}</div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap">{message.content}</div>
+        ) : (
+          <Markdown text={message.content} />
         )}
+        <div className="flex items-center justify-between mt-1.5 -mx-1">
+          {message.model && !isUser && (
+            <div className="text-[10px] opacity-60 px-1">{message.model}</div>
+          )}
+          {!isUser && !message.content.startsWith("⚠️") && (
+            <button
+              onClick={copy}
+              className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-black/5 dark:hover:bg-white/10"
+              title={t("chat.copy")}
+            >
+              {copied ? (
+                <Check className="h-3 w-3 text-aegis-success" />
+              ) : (
+                <Copy className="h-3 w-3 opacity-60" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

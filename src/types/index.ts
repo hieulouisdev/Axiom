@@ -6,7 +6,8 @@ export type ViewId =
   | "memory"
   | "security"
   | "modes"
-  | "settings";
+  | "settings"
+  | "web";
 
 export interface ProviderDto {
   id: string;
@@ -81,6 +82,7 @@ export interface SettingsDto {
   language: string;
   mode: string;
   allow_autonomous: boolean;
+  bypass_mode: boolean;
   auto_defense: boolean;
   monitor: boolean;
   scanner_enabled: boolean;
@@ -135,4 +137,38 @@ export interface SecurityStatus {
   recent_threats: Threat[];
   recent_events: unknown[];
   network_anomalies: NetworkAnomaly[];
+}
+
+// ===== v0.6 — Web access =====
+export interface SearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+export interface WebFetchRawResult {
+  status: number;
+  body: string;
+  len: number;
+  url: string;
+}
+
+// ===== v0.6 — Memory / entities / encryption =====
+export interface MobileCapabilities {
+  max_conversations: number;
+  remote_actions_enabled: boolean;
+  e2ee_sync_available: boolean;
+  desktop_version: string;
+}
+
+export interface EncryptionStatus {
+  status: "not_supported" | "disabled" | "enabled";
+  supported: boolean;
+}
+
+export interface YaraRule {
+  name: string;
+  tags: string[];
+  strings: string[];
+  source: string;
 }

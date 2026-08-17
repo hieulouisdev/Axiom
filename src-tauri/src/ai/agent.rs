@@ -251,6 +251,17 @@ async fn agent_loop_inner(
             &params.user_message,
             &memory.memory.embeddings,
         );
+
+        // v0.6: Auto-extract entities from the latest user message and any
+        // recent history. New facts are persisted to the knowledge base so
+        // subsequent RAG retrievals can find them. Best-effort — failures
+        // are logged but never abort the chat.
+        let texts = vec![params.user_message.clone()];
+        match crate::memory::entities::extract_and_store(&memory.memory, &texts) {
+            Ok(n) if n > 0 => tracing::info!("extracted {n} new entities from user message"),
+            Ok(_) => {}
+            Err(e) => tracing::warn!("entity extraction failed: {e}"),
+        }
     }
 
     let tool_specs: Vec<ToolSpec> = tools::all_specs();

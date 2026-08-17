@@ -52,11 +52,13 @@ export function Providers() {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
-      <header className="px-6 py-4 border-b border-aegis-200 bg-white">
-        <h2 className="text-lg font-semibold text-aegis-900">{t("providers.title")}</h2>
-        <p className="text-xs text-aegis-500 mt-0.5">
-          {providers.filter((p) => p.configured).length} of {providers.length} configured
-        </p>
+      <header className="aegis-section-header">
+        <div>
+          <h2 className="text-lg font-semibold text-aegis-900 dark:text-aegis-100">{t("providers.title")}</h2>
+          <p className="text-xs text-aegis-500 dark:text-aegis-400 mt-0.5">
+            {providers.filter((p) => p.configured).length} of {providers.length} configured
+          </p>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -68,8 +70,8 @@ export function Providers() {
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all
                 ${
                   filter === c.id
-                    ? "bg-aegis-accent text-white"
-                    : "bg-white border border-aegis-200 text-aegis-700 hover:bg-aegis-50"
+                    ? "bg-gradient-accent text-white shadow-soft"
+                    : "bg-white dark:bg-aegis-night-100 border border-aegis-200 dark:border-aegis-night-50 text-aegis-700 dark:text-aegis-300 hover:bg-aegis-50 dark:hover:bg-aegis-night-300"
                 }`}
             >
               {c.label}
@@ -140,8 +142,8 @@ function ProviderCard({
     <div className="aegis-card p-4 flex flex-col">
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-aegis-900 truncate">{provider.name}</h3>
-          <p className="text-[11px] text-aegis-500 mt-0.5">{provider.id}</p>
+          <h3 className="text-sm font-semibold text-aegis-900 dark:text-aegis-100 truncate">{provider.name}</h3>
+          <p className="text-[11px] text-aegis-500 dark:text-aegis-400 mt-0.5">{provider.id}</p>
         </div>
         {provider.is_active && (
           <span className="aegis-badge aegis-badge-low">
@@ -150,7 +152,7 @@ function ProviderCard({
         )}
       </div>
 
-      <p className="text-xs text-aegis-600 mb-3 line-clamp-2">{provider.description}</p>
+      <p className="text-xs text-aegis-600 dark:text-aegis-300 mb-3 line-clamp-2">{provider.description}</p>
 
       <div className="flex flex-wrap gap-1 mb-3">
         {!provider.implemented && (
@@ -229,14 +231,14 @@ function ProviderEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-aegis-900/30 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-elevated w-full max-w-md p-6 animate-slide-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-aegis-900/40 dark:bg-aegis-950/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white dark:bg-aegis-night-200 rounded-2xl shadow-elevated w-full max-w-md p-6 animate-slide-up border border-aegis-200 dark:border-aegis-night-50">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h3 className="text-base font-semibold">{provider.name}</h3>
-            <p className="text-xs text-aegis-500">{provider.description}</p>
+            <h3 className="text-base font-semibold text-aegis-900 dark:text-aegis-100">{provider.name}</h3>
+            <p className="text-xs text-aegis-500 dark:text-aegis-400">{provider.description}</p>
           </div>
-          <button onClick={onClose} className="text-aegis-400 hover:text-aegis-700">
+          <button onClick={onClose} className="text-aegis-400 hover:text-aegis-700 dark:hover:text-aegis-200">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -244,7 +246,7 @@ function ProviderEditor({
         <div className="space-y-3">
           {provider.requires_api_key && (
             <div>
-              <label className="text-xs font-medium text-aegis-700">
+              <label className="text-xs font-medium text-aegis-700 dark:text-aegis-300">
                 {t("providers.api_key")}
               </label>
               <input
@@ -258,7 +260,7 @@ function ProviderEditor({
           )}
 
           <div>
-            <label className="text-xs font-medium text-aegis-700">
+            <label className="text-xs font-medium text-aegis-700 dark:text-aegis-300">
               {t("providers.base_url")}
             </label>
             <input
@@ -270,7 +272,7 @@ function ProviderEditor({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-aegis-700">
+            <label className="text-xs font-medium text-aegis-700 dark:text-aegis-300">
               {t("providers.model")}
             </label>
             <input
@@ -295,7 +297,7 @@ function ProviderEditor({
             >
               <span className="aegis-toggle-knob" />
             </button>
-            <span className="text-xs text-aegis-700">{t("providers.enabled")}</span>
+            <span className="text-xs text-aegis-700 dark:text-aegis-300">{t("providers.enabled")}</span>
           </label>
         </div>
 

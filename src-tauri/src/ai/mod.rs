@@ -11,6 +11,10 @@
 //!   merged from `ai-model-directory` and `models-dev` reference repos.
 //! - [`skills`] — declarative skill packs the AI can load to specialize its
 //!   behavior (code_writer, code_reviewer, refactor, test_writer, …).
+//!
+//! v0.6 adds:
+//! - [`web`] — real web search (DuckDuckGo HTML endpoint) and HTML readability
+//!   extraction. The `web_search` tool is no longer a stub.
 
 pub mod agent;
 pub mod catalog;
@@ -20,6 +24,7 @@ pub mod providers;
 pub mod router;
 pub mod skills;
 pub mod tools;
+pub mod web;
 
 pub use provider::{ChatMessage, ChatRequest, ChatResponse, Provider, ProviderRegistry};
 pub use router::AiRouter;

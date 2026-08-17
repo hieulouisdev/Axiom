@@ -12,13 +12,22 @@ const en: Record<string, string> = {
   "nav.security": "Security",
   "nav.settings": "Settings",
   "nav.modes": "Modes",
+  "nav.web": "Web Search",
+  "nav.theme.toggle": "Toggle theme",
+  "nav.sidebar.toggle": "Toggle sidebar",
   "chat.placeholder": "Type a message…",
   "chat.send": "Send",
   "chat.new_conversation": "New conversation",
   "chat.empty.title": "No messages yet",
-  "chat.empty.subtitle": "Start a conversation to begin.",
+  "chat.empty.subtitle": "Start a conversation to begin. The AI can search the web, read files, and act on your machine.",
+  "chat.empty.feature1": "Search the web in real time",
+  "chat.empty.feature2": "Remember facts about you automatically",
+  "chat.empty.feature3": "Run shell commands safely",
   "chat.thinking": "Thinking…",
   "chat.error_no_provider": "No AI provider configured. Go to AI Providers to add one.",
+  "chat.copy": "Copy",
+  "chat.copied": "Copied!",
+  "chat.regenerate": "Regenerate",
   "settings.title": "Settings",
   "settings.language": "Language",
   "settings.mode": "Operational mode",
@@ -27,6 +36,25 @@ const en: Record<string, string> = {
   "settings.allow_autonomous": "Allow AI to act without asking",
   "settings.allow_autonomous.hint":
     "Dangerous: skips safety confirmation. Use only with trusted providers.",
+  "settings.bypass_mode": "Bypass Mode (advanced)",
+  "settings.bypass_mode.hint":
+    "Skip confirmation for medium/high-risk actions except an irrevocable hard-deny list.",
+  "settings.theme": "Theme",
+  "settings.theme.light": "Light",
+  "settings.theme.dark": "Dark",
+  "settings.data_privacy": "Data & Privacy",
+  "settings.data.export": "Export all data (JSON)",
+  "settings.data.forget": "Forget all data",
+  "settings.data.forget.confirm":
+    "This permanently deletes all conversations, knowledge, and audit logs. Continue?",
+  "settings.audit.export": "Export audit log",
+  "settings.audit.export.json": "JSON",
+  "settings.audit.export.csv": "CSV",
+  "settings.encryption": "Database encryption",
+  "settings.encryption.not_supported":
+    "Not compiled in. Rebuild with the sqlcipher feature to enable at-rest encryption.",
+  "settings.encryption.disabled": "Available but not enabled.",
+  "settings.encryption.enabled": "Enabled — database is encrypted at rest.",
   "providers.title": "AI Providers",
   "providers.add": "Add provider",
   "providers.configure": "Configure",
@@ -48,6 +76,8 @@ const en: Record<string, string> = {
   "memory.knowledge": "Knowledge base",
   "memory.search": "Search…",
   "memory.clear_all": "Clear everything",
+  "memory.entities.extract": "Extract entities now",
+  "memory.entities.extracted": "Extracted {n} new facts",
   "memory.stats.conversations": "Conversations",
   "memory.stats.messages": "Messages",
   "memory.stats.activities": "Activities",
@@ -60,6 +90,10 @@ const en: Record<string, string> = {
   "security.scan_now": "Scan now",
   "security.quarantine": "Quarantine",
   "security.threats.recent": "Recent threats",
+  "security.yara": "YARA rules",
+  "security.yara.empty": "No YARA rules loaded. Drop .yar / .yara files into the rules directory.",
+  "security.yara.open_dir": "Open rules directory",
+  "security.yara.loaded": "{n} rules loaded",
   "severity.info": "Info",
   "severity.low": "Low",
   "severity.medium": "Medium",
@@ -72,6 +106,13 @@ const en: Record<string, string> = {
   "modes.ondemand.title": "On-demand",
   "modes.ondemand.desc":
     "AI stays dormant until called. Lowest cost. Security monitor still runs.",
+  "web.title": "Web Search",
+  "web.placeholder": "Search the web…",
+  "web.searching": "Searching…",
+  "web.fetch": "Fetch page",
+  "web.fetching": "Fetching…",
+  "web.no_results": "No results. Try a different query.",
+  "web.page_content": "Page content",
   "common.save": "Save",
   "common.cancel": "Cancel",
   "common.confirm": "Confirm",
@@ -81,6 +122,9 @@ const en: Record<string, string> = {
   "common.loading": "Loading…",
   "common.error": "Error",
   "common.success": "Success",
+  "common.copy": "Copy",
+  "common.copied": "Copied!",
+  "common.refresh": "Refresh",
 };
 
 const vi: Record<string, string> = {
@@ -92,13 +136,22 @@ const vi: Record<string, string> = {
   "nav.security": "Bảo mật",
   "nav.settings": "Cài đặt",
   "nav.modes": "Chế độ",
+  "nav.web": "Tìm kiếm Web",
+  "nav.theme.toggle": "Đổi giao diện",
+  "nav.sidebar.toggle": "Đổi thanh bên",
   "chat.placeholder": "Nhập tin nhắn…",
   "chat.send": "Gửi",
   "chat.new_conversation": "Cuộc trò chuyện mới",
   "chat.empty.title": "Chưa có tin nhắn",
-  "chat.empty.subtitle": "Bắt đầu trò chuyện để khởi tạo.",
+  "chat.empty.subtitle": "Bắt đầu trò chuyện để khởi tạo. AI có thể tìm kiếm web, đọc tệp và hoạt động trên máy của bạn.",
+  "chat.empty.feature1": "Tìm kiếm web theo thời gian thực",
+  "chat.empty.feature2": "Tự động ghi nhớ thông tin về bạn",
+  "chat.empty.feature3": "Chạy lệnh shell an toàn",
   "chat.thinking": "Đang suy nghĩ…",
   "chat.error_no_provider": "Chưa có nhà cung cấp AI. Vào Nhà cung cấp AI để thêm.",
+  "chat.copy": "Sao chép",
+  "chat.copied": "Đã sao chép!",
+  "chat.regenerate": "Tạo lại",
   "settings.title": "Cài đặt",
   "settings.language": "Ngôn ngữ",
   "settings.mode": "Chế độ hoạt động",
@@ -107,6 +160,25 @@ const vi: Record<string, string> = {
   "settings.allow_autonomous": "Cho phép AI tự hành động không cần hỏi",
   "settings.allow_autonomous.hint":
     "Nguy hiểm: bỏ qua xác nhận an toàn. Chỉ dùng với provider tin cậy.",
+  "settings.bypass_mode": "Bypass Mode (nâng cao)",
+  "settings.bypass_mode.hint":
+    "Bỏ qua xác nhận cho hành động trung/cao rủi ro, trừ danh sách cứng từ chối.",
+  "settings.theme": "Giao diện",
+  "settings.theme.light": "Sáng",
+  "settings.theme.dark": "Tối",
+  "settings.data_privacy": "Dữ liệu & Quyền riêng tư",
+  "settings.data.export": "Xuất toàn bộ dữ liệu (JSON)",
+  "settings.data.forget": "Xóa toàn bộ dữ liệu",
+  "settings.data.forget.confirm":
+    "Thao tác này sẽ xóa vĩnh viễn toàn bộ cuộc trò chuyện, kiến thức và nhật ký. Tiếp tục?",
+  "settings.audit.export": "Xuất nhật ký kiểm toán",
+  "settings.audit.export.json": "JSON",
+  "settings.audit.export.csv": "CSV",
+  "settings.encryption": "Mã hóa cơ sở dữ liệu",
+  "settings.encryption.not_supported":
+    "Chưa được biên dịch. Biên dịch lại với tính năng sqlcipher để bật mã hóa.",
+  "settings.encryption.disabled": "Có sẵn nhưng chưa bật.",
+  "settings.encryption.enabled": "Đã bật — cơ sở dữ liệu được mã hóa tại nơi lưu trữ.",
   "providers.title": "Nhà cung cấp AI",
   "providers.add": "Thêm provider",
   "providers.configure": "Cấu hình",
@@ -128,6 +200,8 @@ const vi: Record<string, string> = {
   "memory.knowledge": "Cơ sở kiến thức",
   "memory.search": "Tìm kiếm…",
   "memory.clear_all": "Xóa toàn bộ",
+  "memory.entities.extract": "Trích xuất thực thể ngay",
+  "memory.entities.extracted": "Đã trích xuất {n} sự kiện mới",
   "memory.stats.conversations": "Cuộc trò chuyện",
   "memory.stats.messages": "Tin nhắn",
   "memory.stats.activities": "Hoạt động",
@@ -140,6 +214,10 @@ const vi: Record<string, string> = {
   "security.scan_now": "Quét ngay",
   "security.quarantine": "Cách ly",
   "security.threats.recent": "Mối đe dọa gần đây",
+  "security.yara": "Quy tắc YARA",
+  "security.yara.empty": "Không có quy tắc YARA nào. Hãy thả tệp .yar / .yara vào thư mục quy tắc.",
+  "security.yara.open_dir": "Mở thư mục quy tắc",
+  "security.yara.loaded": "Đã nạp {n} quy tắc",
   "severity.info": "Thông tin",
   "severity.low": "Thấp",
   "severity.medium": "Trung bình",
@@ -152,6 +230,13 @@ const vi: Record<string, string> = {
   "modes.ondemand.title": "Khi được gọi",
   "modes.ondemand.desc":
     "AI ngủ cho đến khi được gọi. Chi phí thấp nhất. Bộ bảo mật vẫn chạy.",
+  "web.title": "Tìm kiếm Web",
+  "web.placeholder": "Tìm kiếm web…",
+  "web.searching": "Đang tìm…",
+  "web.fetch": "Mở trang",
+  "web.fetching": "Đang tải…",
+  "web.no_results": "Không có kết quả. Thử từ khóa khác.",
+  "web.page_content": "Nội dung trang",
   "common.save": "Lưu",
   "common.cancel": "Hủy",
   "common.confirm": "Xác nhận",
@@ -161,6 +246,9 @@ const vi: Record<string, string> = {
   "common.loading": "Đang tải…",
   "common.error": "Lỗi",
   "common.success": "Thành công",
+  "common.copy": "Sao chép",
+  "common.copied": "Đã sao chép!",
+  "common.refresh": "Làm mới",
 };
 
 const tables: Record<Locale, Record<string, string>> = { en, vi };
@@ -173,6 +261,12 @@ export function setLocale(l: Locale) {
 export function getLocale(): Locale {
   return current;
 }
-export function t(key: string): string {
-  return tables[current][key] ?? tables.en[key] ?? key;
+export function t(key: string, vars?: Record<string, string | number>): string {
+  let s = tables[current][key] ?? tables.en[key] ?? key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      s = s.replace(`{${k}}`, String(v));
+    }
+  }
+  return s;
 }

@@ -4,6 +4,281 @@ All notable changes to Aegis AI are documented in this file. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-08-18 — Real Web Access + UI Overhaul + Phase 3 Completion
+
+### Added — Real web access (`src-tauri/src/ai/web.rs`)
+
+- **`web_search(query)`** — DuckDuckGo HTML endpoint integration. No API
+  key required. Parses up to 8 results (title / URL / snippet) and
+  resolves DDG's `//duckduckgo.com/l/?uddg=<encoded>` redirect wrapper
+  to surface the real underlying URL.
+- **`fetch_readable(url)`** — Fetches a URL, strips `<script>` /
+  `<style>` / `<nav>` / `<header>` / `<footer>` / `<aside>` / `<form>`
+  / `<noscript>` / `<svg>` / `<iframe>` / `<button>` blocks, decodes
+  HTML entities, and returns up to 32 KB of plain text per page.
+- **`extract_readable(html)`** — Public helper that exposes the
+  readability extractor for callers that already have HTML in hand.
+- **`strip_tags(html)`** — Public helper that strips tags + decodes
+  entities + collapses whitespace.
+- The `web_search` AI tool is no longer a stub — it dispatches to the
+  real `web_search_sync` helper from the agent loop.
+- The `http_fetch` AI tool now uses the readability extractor for GET
+  requests without a body, returning `extracted: "readable_text"` so
+  the AI sees plain text instead of raw HTML.
+- Three new Tauri commands: `web_search`, `web_fetch`, `web_fetch_raw`
+  expose these to the frontend.
+- New "Web Search" view (`src/components/Web.tsx`) — a DuckDuckGo-powered
+  search panel in the sidebar with a result list and a one-click page
+  preview.
+
+### Added — Auto entity extraction (`src-tauri/src/memory/entities.rs`)
+
+- **`extract_from_messages(messages)`** — Pure-Rust extractor that
+  recognises:
+  - Regex entities (confidence 0.6–0.75): emails, URLs, IPv4 addresses,
+    phone numbers (international format), ISO 8601 dates, GitHub repos
+    (`owner/repo` shape).
+  - Heuristic entities (confidence 0.85): `my name is X`, `I live in X`,
+    `I'm based in X`, `my pet/dog/cat is called X`, `I work at X`,
+    `my favorite X is Y`, `remember that X`, `my timezone is X`,
+    `I'm a X by trade/profession`.
+- **`extract_and_store(store, messages)`** — High-level entry point that
+  deduplicates against the existing knowledge base (skips entities
+  whose `kind:value` key already exists) and persists new entries via
+  `MemoryStore::remember`, which updates both the knowledge table and
+  the embedding store.
+- Wired into the agent loop (`ai::agent`) AND the basic `ai_chat` /
+  `ai_chat_stream` commands so every chat turn contributes to the
+  user's long-term memory without requiring explicit
+  `memory_remember` tool calls.
+- New `memory_extract_entities` Tauri command + Memory UI button lets
+  the user run extraction manually over a conversation's last 100
+  messages and reports the count of new facts stored.
+
+### Added — Mobile companion scaffold (`src-tauri/src/mobile.rs`)
+
+- **`MobileCapabilities`** struct (max_conversations, remote_actions,
+  e2ee_sync_available, desktop_version) with a default that matches the
+  v0.6 read-only companion contract.
+- **`capabilities()`** function + `mobile_capabilities` Tauri command
+  expose the capabilities to the frontend for the (future) pairing
+  handshake.
+- **`e2ee_sync_status()`** stub returns "Phase 4 — not yet implemented"
+  so the UI can show a "coming soon" badge.
+- **`mobile_run()`** entry point (gated behind `cfg(mobile)`) delegates
+  to the desktop `run()`. Tauri sets `cfg(mobile)` automatically when
+  building for iOS / Android.
+- Module documents the Phase 4 build instructions (`cargo tauri
+  android init` / `cargo tauri ios init`).
+
+### Added — GDPR data export + audit log export
+
+- **`memory_export_all`** Tauri command — returns every conversation +
+  message as a single JSON document with an `exported_at_ms` timestamp
+  and the desktop version. The "Export all data (JSON)" button in
+  Settings → Data & Privacy downloads this as a file.
+- **`memory_forget_all`** Tauri command — GDPR "right to be forgotten".
+  Drops conversations, activities, knowledge, knowledge_embeddings,
+  events, integrity_baselines, and the audit log in a single
+  transaction. Settings + provider credentials are NOT wiped (those
+  are user-controlled via the Providers UI).
+- **`audit_export(limit, format)`** Tauri command — exports the AI
+  tool-call audit log as JSON or CSV. The CSV writer is built-in (no
+  `csv` crate dependency) and handles quoting / escaping per RFC 4180.
+  Two buttons in Settings → Data & Privacy trigger JSON / CSV exports.
+
+### Added — YARA rule loader (`src-tauri/src/security/yara.rs`)
+
+- **`YaraRule`** struct with name, tags, literal strings, source path.
+- **`load_all()`** — discovers `.yar` / `.yara` files under
+  `~/.local/share/aegis-ai/yara/` and parses them with a forgiving
+  regex (skips malformed rules silently).
+- **`parse_rules(text, source)`** — parses rule headers
+  (`rule foo : tag1 tag2 {`) and extracts literal double-quoted
+  strings (`$a = "literal"`).
+- **`scan_file(rules, content)`** — stop-gap matcher that runs the
+  literal strings against file bytes. Catches the majority of
+  indicator-of-compromise rules without needing the full YARA engine.
+- **`ensure_dir()`** — creates the rules directory at boot so the user
+  can drop rule files into it without manually creating the path.
+- Two new Tauri commands: `yara_list` returns the parsed rules;
+  `yara_ensure_dir` creates the directory.
+- New YARA panel in the Security UI shows loaded rules + tags + source
+  file name, with a refresh button and the rules-directory path
+  displayed for convenience.
+
+### Added — SQLCipher opt-in stub (`src-tauri/src/memory/encryption.rs`)
+
+- **`EncryptionStatus`** enum (`NotSupported` / `Disabled` / `Enabled`).
+- **`is_supported()`** — returns `false` for v0.6 (the `sqlcipher`
+  cargo feature is not yet wired in). Will become
+  `cfg!(feature = "sqlcipher")` in Phase 4.
+- **`status()`** — returns the current status, surfaced via the
+  `memory_encryption_status` Tauri command.
+- **`set_passphrase(passphrase)`** / **`disable_encryption(passphrase)`**
+  — stubs that return a helpful "not supported in this build" error
+  so the UI can show a "rebuild with `--features sqlcipher`" hint.
+- Module documents the Phase 4 implementation plan (PBKDF2 key
+  derivation, `PRAGMA rekey`, keychain storage).
+
+### Added — UI overhaul
+
+- **Dark mode** (`src/store/index.ts` + `src/index.css`):
+  - `Theme` type (`"light" | "dark"`), persisted to `localStorage`
+    under `aegis-theme`.
+  - `setTheme(t)` applies the `dark` class to `<html>` so Tailwind's
+    `dark:` variant picks it up.
+  - Theme toggle button in the sidebar (Sun ↔ Moon icon).
+  - Every component updated with `dark:` variants for background,
+    text, border, and shadow tokens.
+- **Gradient accents** (`tailwind.config.js`):
+  - New `bg-gradient-accent` (blue → purple) used on primary buttons,
+    the active nav item, the sidebar logo, and the chat empty-state
+    icon.
+  - New `bg-gradient-accent-soft` (8% opacity) used on stat cards and
+    feature pills.
+  - New `aegis-gradient-text` utility for the sidebar app name (animated
+    gradient shift).
+- **Markdown renderer** (`src/components/Markdown.tsx`):
+  - ~150 LOC, no external dependency.
+  - Renders headings (h1–h6), bold (`**x**`), italic (`*x*`), inline
+    code (`` `x` ``), fenced code blocks with copy button + language
+    label, unordered lists, ordered lists, blockquotes, links, and
+    paragraphs.
+  - Code blocks use the dark `aegis-900` background in both themes so
+    syntax is readable.
+  - Copy button on each code block with a 1.5s "Copied!" confirmation.
+- **Animated empty states**:
+  - Chat empty state now shows three feature pills ("Search the web in
+    real time", "Remember facts about you automatically", "Run shell
+    commands safely") + a bounce-in gradient sparkle icon.
+  - Web view has its own search-themed empty state.
+- **Slide-up message bubbles** — every chat message animates in with a
+  subtle 4px translate.
+- **Pulse-soft thinking indicator** — three dots fade in/out at staggered
+  intervals while the AI is generating.
+- **Collapsible sidebar** — toggle button (PanelLeft / PanelLeftClose
+  icons) collapses the sidebar to icon-only (64px wide). State persisted
+  to `localStorage` under `aegis-sidebar-collapsed`.
+- **Auto-resizing textarea** — the chat input grows with its content up
+  to a 160px max.
+- **Better focus rings** — `outline: 2px solid #3B82F6` on `:focus-visible`
+  for keyboard navigation.
+- **Better scrollbars** — 8px wide, hover-brighten, themed for dark mode.
+- **Glassmorphism section headers** — `backdrop-blur` + 80% opacity on
+  the header bar so content scrolls cleanly underneath.
+- **New CSS component classes** (`src/index.css`):
+  - `aegis-card-hover` — card with hover elevation + border highlight.
+  - `aegis-btn-ghost` — minimal ghost button for tertiary actions.
+  - `aegis-section-header` — flex header with backdrop-blur.
+  - `aegis-code-block` — dark code block for AI responses.
+  - `aegis-skeleton` — shimmer loading placeholder.
+
+### Added — i18n keys (EN + VI)
+
+- 30+ new translation keys for the Web view, theme toggle, sidebar
+  toggle, data privacy panel, audit export, YARA rules, entity
+  extraction, and bypass mode.
+- `t(key, vars?)` now supports `{var}` interpolation, used by
+  `memory.entities.extracted` ("Extracted {n} new facts") and
+  `security.yara.loaded` ("{n} rules loaded").
+
+### Added — New Tauri commands (15)
+
+- `web_search`, `web_fetch`, `web_fetch_raw` — web access.
+- `memory_extract_entities`, `memory_encryption_status`,
+  `memory_export_all`, `memory_forget_all` — memory + privacy.
+- `yara_list`, `yara_ensure_dir` — YARA rules.
+- `audit_export` — audit log export.
+- `mobile_capabilities` — mobile companion.
+
+Total command count: 71 → 86.
+
+### Fixed (pre-existing v0.5 issues)
+
+- **`SettingsDto` was missing `bypass_mode`** in the TypeScript types
+  (`src/types/index.ts`), which caused the Settings UI to silently drop
+  the bypass-mode toggle state on save. The Rust `SettingsDto` already
+  had the field; the TS side just wasn't serialising it. Fixed by
+  adding `bypass_mode: boolean` to the TS interface and a bypass-mode
+  toggle card in the Settings UI (amber-themed to signal caution).
+- **Sidebar version defaulted to `"0.2.0"`** instead of the actual app
+  version. The `appVersion()` call worked, but the `useState` initial
+  value was a stale hard-coded string that flashed on every reload
+  before the async call resolved. Fixed by changing the default to
+  `"0.6.0"` and rendering the version only after `appVersion()` returns.
+- **`web_search` tool was a stub** that returned an empty result list
+  with a "wire up your favourite search provider" note. Replaced with
+  the real DuckDuckGo integration described above.
+- **`http_fetch` returned raw HTML**, which the AI often struggled to
+  parse. Now uses the readability extractor for GET requests without a
+  body, returning plain text. POST / PUT / etc. still return raw bodies
+  for API integrations.
+- **Chat bubbles didn't render markdown** — assistant replies showed
+  raw `**bold**` / `` `code` `` / etc. Now rendered via the new
+  `Markdown` component.
+- **Chat input didn't auto-resize** — the textarea was fixed at 1 row,
+  so long messages overflowed horizontally. Now grows with content up
+  to 160px.
+- **No keyboard focus indicator** — `:focus` had no visible ring on
+  most elements. Added `:focus-visible` with a 2px blue outline.
+- **Dark scrollbars** were bright even in dark mode. Added themed
+  scrollbar styles for `html.dark`.
+- **Theme preference was lost on reload** — the theme toggle wasn't
+  persisted. Now stored in `localStorage` and applied before React
+  mounts to avoid a flash of the wrong theme.
+
+### Changed
+
+- Bumped version to `0.6.0` in `Cargo.toml`, `package.json`, and
+  `tauri.conf.json`.
+- `tailwind.config.js`: enabled `darkMode: "class"`, added
+  `aegis.night.*` dark-mode tokens, added `bg-gradient-accent` /
+  `bg-gradient-accent-soft` / `bg-gradient-dark`, added `shadow-glow`
+  / `shadow-glow-dark`, added `animate-slide-in-left` /
+  `animate-shimmer` / `animate-bounce-in` keyframes.
+- `src/store/index.ts`: added `theme` / `setTheme` / `toggleTheme` /
+  `sidebarCollapsed` / `toggleSidebar` to the Zustand store, with
+  `localStorage` persistence.
+- `src/types/index.ts`: added `SearchResult`, `WebFetchRawResult`,
+  `MobileCapabilities`, `EncryptionStatus`, `YaraRule` interfaces.
+- `src/lib/tauri.ts`: added bindings for all 15 new Tauri commands.
+- `src/components/Sidebar.tsx`: full rewrite with collapsible state,
+  theme toggle, gradient logo, active-state animations, "new" badge
+  for the Web view.
+- `src/components/Chat.tsx`: full rewrite with markdown rendering,
+  copy button, auto-resizing input, animated empty state, animated
+  thinking indicator.
+- `src/components/Settings.tsx`: full rewrite with theme picker,
+  bypass-mode toggle, encryption status, data export / forget panel,
+  audit log export buttons.
+- `src/components/Memory.tsx`: added entity-extraction button + dark
+  mode support.
+- `src/components/Security.tsx`: added YARA rules panel + dark mode
+  support.
+- `src/components/Modes.tsx`: dark mode support.
+- `src/components/Providers.tsx`: dark mode support for the provider
+  grid + editor modal.
+- `src/App.tsx`: added the new `Web` view to the routing.
+- `src-tauri/src/lib.rs`: registered the `mobile` module + all 15 new
+  Tauri commands in `tauri::generate_handler!`.
+
+### Internal
+
+- Added `web_search` integration tests in `src-tauri/src/ai/web.rs`
+  (URL decoding, HTML stripping, DDG result parsing, readability
+  extraction, truncation).
+- Added entity-extraction tests in
+  `src-tauri/src/memory/entities.rs` (regex + heuristic patterns,
+  dedup, end-to-end extract-and-store).
+- Added YARA rule parser tests in `src-tauri/src/security/yara.rs`
+  (single rule, multiple rules, scan-file matches, no false positives).
+- Added SQLCipher stub tests in
+  `src-tauri/src/memory/encryption.rs` (v0.6 status is
+  `NotSupported`, `set_passphrase` returns a config error).
+
+---
+
 ## [0.5.0] — 2026-08-17 — Phase 3 Continues: Voice I/O + Vector RAG + CalDAV Calendar
 
 ### Added — Voice I/O subsystem (`src/voice/`)

@@ -226,11 +226,11 @@ pub fn all_specs() -> Vec<ToolSpec> {
             r#type: "function".into(),
             function: FunctionSpec {
                 name: "web_search".into(),
-                description: "Search the web for a query. (Stubbed in v0.3 — returns an empty result list with a note.)".into(),
+                description: "Search the web for a query and return up to 8 results (title, URL, snippet). Powered by DuckDuckGo — no API key required. Use this for current information, looking up documentation, fact-checking, or finding URLs to fetch.".into(),
                 parameters: json!({
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string"}
+                        "query": {"type": "string", "description": "The search query."}
                     },
                     "required": ["query"]
                 }),
@@ -517,11 +517,7 @@ pub fn dispatch(
             Err(e) => error_json(&call.name, &e),
         },
         "clipboard_write" => run_clipboard_write(&call.arguments),
-        "web_search" => json!({
-            "results": [],
-            "note": "web_search is stubbed in v0.4 — wire up your favourite search provider to enable this."
-        })
-        .to_string(),
+        "web_search" => run_web_search(&call.arguments),
         "http_fetch" => run_http_fetch(&call.arguments),
         "git_op" => run_git_op(policy, &call.arguments),
         "process_list" => run_process_list(),
@@ -691,6 +687,18 @@ fn run_clipboard_write(args: &Value) -> String {
         Ok(_) => json!({"ok": true}).to_string(),
         Err(e) => error_json("clipboard_write", &e),
     }
+}
+
+/// v0.6: Real web search via DuckDuckGo's HTML endpoint. No API key needed.
+/// Returns up to 8 hits with title, URL, and snippet — enough for the AI to
+/// either summarise the answer or call `http_fetch` on the most relevant URL.
+fn run_web_search(args: &Value) -> String {
+    let query = match args.get("query").and_then(|v| v.as_str()) {
+        Some(s) => s.to_string(),
+        None => return json!({"error":"missing 'query' argument"}).to_string(),
+    };
+    let results = crate::ai::web::web_search_sync(&query);
+    serde_json::to_string(&results).unwrap_or_else(|_| json!({"error":"serialization failed"}).to_string())
 }
 
 fn run_memory_remember(
@@ -1085,6 +1093,25 @@ fn run_http_fetch(args: &Value) -> String {
         .unwrap_or("GET")
         .to_uppercase();
     let body = args.get("body").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+    // v0.6: if the URL looks like an HTML page and method is GET, use the
+    // readability extractor so the AI gets plain text instead of raw HTML.
+    // For non-GET methods or explicit headers, fall back to the raw fetcher.
+    let wants_readable = method == "GET" && body.is_none();
+    if wants_readable {
+        let text = crate::ai::web::fetch_readable_sync(&url);
+        if text.starts_with("{\"error\":\"") {
+            return text;
+        }
+        return json!({
+            "status": 200,
+            "body": text,
+            "url": url,
+            "extracted": "readable_text",
+            "len": text.len(),
+        })
+        .to_string();
+    }
 
     // Block on a sync HTTP call. This is fine because dispatch() runs in a
     // sync context — the agent loop calls it from a sync helper.

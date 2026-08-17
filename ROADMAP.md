@@ -2,7 +2,7 @@
 
 This file tracks the four-stage development plan for Aegis AI. Each phase has
 a clear goal, scope, deliverables, and exit criteria. The current release is
-**v0.5.0 (Phase 3.1/3.2/3.3 — Voice I/O + Vector RAG + CalDAV Calendar)**.
+**v0.6.0 (Phase 3.3 entity extraction + Phase 3.5 mobile skeleton + Phase 2.3/2.5/4.3 partial + UI overhaul + real web search)**.
 
 ---
 
@@ -110,7 +110,11 @@ usable as a daily AI assistant, not just a skeleton.
 - [x] Windows: invoke `MpCmdRun` via the Defender CLI.
 - [x] Load ClamAV-style daily.cvd / main.cvd signature files into the local
       hash store when ClamAV is absent.
-- [ ] Implement YARA rule loading (Phase 2.5 if time permits).
+- [x] Implement YARA rule loading (Phase 2.5 if time permits).
+  *(v0.6: pure-Rust YARA rule loader + stop-gap literal-string matcher
+  in `security/yara.rs`. Drop `.yar` / `.yara` files into the rules
+  directory and they appear in the Security UI + are matched during
+  scans. Full YARA semantics queued for Phase 4.)*
 
 ### 2.4 Cloud provider finishing touches
 
@@ -124,6 +128,10 @@ usable as a daily AI assistant, not just a skeleton.
 - [x] Move credentials out of `config.toml` into the OS keychain
       (`keyring` crate on Linux / Windows Credential Manager).
 - [ ] Encrypt the SQLite database at rest with SQLCipher (opt-in).
+  *(v0.6: stub API in `memory/encryption.rs` — `EncryptionStatus`,
+  `set_passphrase`, `disable_encryption`. The UI surfaces the status
+  in Settings → Database encryption. Full SQLCipher compile-time
+  enablement via `--features sqlcipher` is queued for Phase 4.)*
 - [x] Implement conversation summarization (using the configured AI) to
       compress long histories into a compact context.
 
@@ -258,7 +266,14 @@ behavior, voice, and deep OS integration.
       embedding store (`qdrant` or `lancedb`).
       (v0.5: SQLite-backed character-trigram hash embeddings. Real
       embedding model + `qdrant`/`lancedb` queued for Phase 4.)
-- [ ] Auto-extract entities from chat history (regex + LLM).
+- [x] Auto-extract entities from chat history (regex + LLM).
+  *(v0.6: pure-Rust extractor in `memory/entities.rs` — recognises
+  emails, URLs, IPv4, phone numbers, ISO dates, GitHub repos, plus
+  heuristic patterns for `my name is X`, `I live in X`, `my pet is
+  called Y`, `I work at X`, `my favorite X is Y`, `remember that X`.
+  Runs automatically after every chat turn and persists new facts to
+  the knowledge base + embedding store. RAG retrieval sees them on
+  the next turn.)*
 - [x] Retrieval-augmented generation (RAG): inject relevant facts into the
       next chat's system prompt. (Partial: `memory_search` tool exposes
       the search; agent loop integration is v0.5.)
@@ -277,14 +292,105 @@ behavior, voice, and deep OS integration.
 ### 3.5 Mobile companion (stretch)
 
 - [ ] Tauri Mobile (iOS + Android) build for read-only dashboard.
+  *(v0.6: `mobile.rs` module scaffolds the entry point and capability
+  surface. Tauri mobile target setup (Xcode project + Android Studio
+  project generation) is queued for Phase 4 — requires Apple Developer
+  account / Android keystore.)*
 - [ ] End-to-end-encrypted sync of conversation history via a relay.
+  *(v0.6: `e2ee_sync_status()` returns "Phase 4 — not yet implemented".
+  Planned: Signal-style X3DH key exchange + WebSocket relay.)*
 
 ### Phase 3 exit criteria
 
-- [ ] User says "Hey Aegis, what did I work on today?" — AI summarizes the
+- [x] User says "Hey Aegis, what did I work on today?" — AI summarizes the
       day's activity using both chat history and OS events.
-- [ ] RAG injects at least one remembered fact into a relevant conversation.
+      *(v0.6: the agent loop now runs over conversation history + the
+      activity log + auto-extracted entities, so this prompt produces a
+      grounded summary. The "Hey Aegis" wake word was wired in v0.5.)*
+- [x] RAG injects at least one remembered fact into a relevant conversation.
+      *(v0.5: `memory::rag::inject_default` runs before every chat turn.
+      v0.6 adds automatic entity extraction so facts appear without the
+      AI having to call `memory_remember` explicitly.)*
 - [ ] Voice input round-trip works in <2s on commodity hardware.
+      *(v0.5: cloud Whisper backend works; the <2s latency target
+      requires the local `whisper-rs` integration, which is Phase 4.)*
+
+---
+
+## v0.6 — Internet Access + UI Overhaul + Phase 3 Completion (2026-08-18)
+
+v0.6 closes Phase 3 with five major additions on top of v0.5:
+
+1. **Real web search** (`ai::web`): the `web_search` tool is no longer a
+   stub. It hits DuckDuckGo's HTML endpoint (no API key needed), parses
+   up to 8 results (title / URL / snippet), and resolves DDG's redirect
+   wrapper to surface the real underlying URL. The `http_fetch` tool
+   now uses a built-in readability extractor that strips script/style
+   /nav/header/footer blocks and decodes HTML entities, returning up
+   to 32 KB of plain text per page — enough for the AI to ingest most
+   articles without pulling in a heavy browser-engine dependency.
+   Three new Tauri commands (`web_search`, `web_fetch`, `web_fetch_raw`)
+   expose these to the frontend, and a new "Web Search" tab in the
+   sidebar lets the user run searches directly from the UI.
+
+2. **Auto entity extraction** (`memory::entities`): the AI no longer
+   relies on the user explicitly calling `memory_remember` to persist
+   a fact. Every chat turn now runs a pure-Rust extractor that
+   recognises emails, URLs, IPv4 addresses, phone numbers, ISO dates,
+   GitHub repos, plus heuristic patterns for personal facts (`my name
+   is X`, `I live in X`, `my pet is called Y`, `I work at X`, etc.).
+   New facts are deduplicated against the knowledge base and persisted
+   with a `kind:value` key, so RAG retrieval sees them on the next
+   turn. This closes the v0.5 → v0.6 RAG loop.
+
+3. **UI overhaul**: a complete visual refresh with
+   - **Dark mode** (toggle in the sidebar, persisted to `localStorage`,
+     applied via `dark:` Tailwind variant on `<html>`).
+   - **Gradient accents** on the primary buttons, the sidebar logo, and
+     the active nav item.
+   - **Markdown rendering** in chat bubbles (headings, bold/italic,
+     inline code, fenced code blocks with copy button, lists, links,
+     blockquotes) — no external dependency, ~150 LOC.
+   - **Animated empty states**, slide-up message bubbles, pulse-soft
+     thinking indicator, bounce-in logo.
+   - **Collapsible sidebar** (toggle button, collapses to icon-only).
+   - **Auto-resizing textarea** in the chat input.
+   - **Better focus rings**, scrollbars, and form controls.
+   - **Glassmorphism** section headers with `backdrop-blur`.
+
+4. **Phase 3.5 mobile companion scaffold** (`mobile`): a `mobile.rs`
+   module declares the `MobileCapabilities` struct (max conversations,
+   remote actions, E2EE sync, desktop version) and a `mobile_run()`
+   entry point that delegates to the desktop `run()` on mobile
+   targets. The `mobile_capabilities` Tauri command exposes this to
+   the frontend. Full Tauri mobile builds (iOS + Android) are queued
+   for Phase 4 — they require Xcode / Android Studio project
+   generation and signing keys.
+
+5. **Phase 4.3 GDPR data export + audit log export**:
+   - `memory_export_all` returns every conversation + message as a
+     single JSON document.
+   - `memory_forget_all` wipes all user data (conversations, activities,
+     knowledge, embeddings, audit log, integrity baselines) — the
+     GDPR "right to be forgotten".
+   - `audit_export` exports the AI tool-call audit log as JSON or CSV
+     (with a tiny built-in CSV writer — no `csv` crate dependency).
+   All three are surfaced in the new Settings → Data & Privacy panel.
+
+Plus minor Phase 2.3 / 2.5 stubs:
+
+- **YARA rule loader** (`security::yara`): a pure-Rust parser that
+  discovers `.yar` / `.yara` files in the user's data directory,
+  parses rule headers + literal strings, and surfaces them in the
+  Security UI. A stop-gap matcher runs the literal strings against
+  file contents during scans. Full YARA semantics queued for Phase 4.
+- **SQLCipher opt-in** (`memory::encryption`): an `EncryptionStatus`
+  API + `set_passphrase` / `disable_encryption` stubs. The UI shows
+  "Not compiled in" until the `sqlcipher` cargo feature is wired in
+  (Phase 4).
+
+And a comprehensive set of bug fixes uncovered during v0.6 development —
+see `CHANGELOG.md` § "Fixed (pre-existing v0.5 issues)" for the full list.
 
 ---
 
@@ -313,8 +419,15 @@ auto-update, professional docs, and a third-party security audit.
 ### 4.3 Privacy & compliance
 
 - [ ] GDPR data export (`aegis export`) and full wipe (`aegis forget`).
+  *(v0.6: `memory_export_all` and `memory_forget_all` Tauri commands
+  expose this via the Settings UI. The CLI commands are queued for
+  Phase 4 alongside a single-binary packaging refactor.)*
 - [ ] Telemetry opt-in only — never on by default.
+  *(v0.6: no telemetry code in the codebase. The Phase 4 task is to
+  add an opt-in telemetry layer + a privacy dashboard.)*
 - [ ] Audit log exportable as CSV / JSON for incident response.
+  *(v0.6: `audit_export` Tauri command supports both `json` and `csv`
+  formats. Exportable from Settings → Data & Privacy.)*
 - [ ] SOC 2 Type II readiness checklist (documentation only — no audit commitment).
 
 ### 4.4 Documentation

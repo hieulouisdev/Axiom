@@ -4,14 +4,19 @@ import type {
   ChatResponseDto,
   ChatStreamStartDto,
   Conversation,
+  EncryptionStatus,
   ExecResult,
   FileReadResult,
   MemoryStats,
   Message,
+  MobileCapabilities,
   ProviderDto,
   ScanResult,
+  SearchResult,
   SecurityStatus,
   SettingsDto,
+  WebFetchRawResult,
+  YaraRule,
 } from "../types";
 
 // ===== AI =====
@@ -104,6 +109,20 @@ export const memoryStats = () => invoke<MemoryStats>("memory_stats");
 export const memorySummarize = (conversation_id: string) =>
   invoke<string>("memory_summarize", { conversationId: conversation_id });
 
+// v0.6 — entity extraction
+export const memoryExtractEntities = (conversation_id: string, limit?: number) =>
+  invoke<number>("memory_extract_entities", { conversationId: conversation_id, limit: limit ?? null });
+
+// v0.6 — encryption status
+export const memoryEncryptionStatus = () =>
+  invoke<EncryptionStatus>("memory_encryption_status");
+
+// v0.6 — GDPR data export / wipe
+export const memoryExportAll = () =>
+  invoke<unknown>("memory_export_all");
+export const memoryForgetAll = () =>
+  invoke<void>("memory_forget_all");
+
 // ===== Security =====
 export const securityStatus = () => invoke<SecurityStatus>("security_status");
 export const securityScan = (path: string, max_depth = 5) =>
@@ -121,6 +140,14 @@ export const securityIntegritySaveBaseline = () =>
 export const securityNetworkScan = () =>
   invoke("security_network_scan");
 
+// v0.6 — YARA rules
+export const yaraList = () => invoke<YaraRule[]>("yara_list");
+export const yaraEnsureDir = () => invoke<void>("yara_ensure_dir");
+
+// v0.6 — audit log export
+export const auditExport = (limit?: number, format?: "json" | "csv") =>
+  invoke<unknown>("audit_export", { limit: limit ?? null, format: format ?? null });
+
 // ===== Modes =====
 export const modesGetActive = () => invoke<"continuous" | "ondemand">("modes_get_active");
 export const modesSetMode = (mode: "continuous" | "ondemand") =>
@@ -133,6 +160,18 @@ export const i18nGetLocale = () => invoke<string>("i18n_get_locale");
 export const i18nSetLocale = (locale: string) =>
   invoke<void>("i18n_set_locale", { locale });
 export const i18nTranslate = (key: string) => invoke<string>("i18n_translate", { key });
+
+// ===== v0.6 — Web access =====
+export const webSearch = (query: string) =>
+  invoke<SearchResult[]>("web_search", { query });
+export const webFetch = (url: string) =>
+  invoke<string>("web_fetch", { url });
+export const webFetchRaw = (url: string, method?: string, body?: string) =>
+  invoke<WebFetchRawResult>("web_fetch_raw", { url, method: method ?? null, body: body ?? null });
+
+// ===== v0.6 — Mobile capabilities =====
+export const mobileCapabilities = () =>
+  invoke<MobileCapabilities>("mobile_capabilities");
 
 // ===== System =====
 export const appVersion = () => invoke<string>("app_version");

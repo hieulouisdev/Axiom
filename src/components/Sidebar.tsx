@@ -7,14 +7,26 @@ import {
   Lock,
   Settings as SettingsIcon,
   Sun,
-  X,
+  Moon,
+  PanelLeftClose,
+  PanelLeft,
+  Globe,
+  type LucideIcon,
 } from "lucide-react";
 import { useStore, type ViewId } from "../store";
 import { t } from "../i18n";
 import { appVersion } from "../lib/tauri";
 
-const NAV: { id: ViewId; icon: typeof Shield; key: string }[] = [
+interface NavItem {
+  id: ViewId;
+  icon: LucideIcon;
+  key: string;
+  badge?: string;
+}
+
+const NAV: NavItem[] = [
   { id: "chat", icon: MessageSquare, key: "nav.chat" },
+  { id: "web", icon: Globe, key: "nav.web", badge: "new" },
   { id: "providers", icon: Cpu, key: "nav.providers" },
   { id: "memory", icon: Database, key: "nav.memory" },
   { id: "security", icon: Lock, key: "nav.security" },
@@ -25,55 +37,126 @@ const NAV: { id: ViewId; icon: typeof Shield; key: string }[] = [
 export function Sidebar() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
-  const [version, setVersion] = useState("0.2.0");
+  const theme = useStore((s) => s.theme);
+  const toggleTheme = useStore((s) => s.toggleTheme);
+  const collapsed = useStore((s) => s.sidebarCollapsed);
+  const toggleSidebar = useStore((s) => s.toggleSidebar);
+  const [version, setVersion] = useState("0.6.0");
 
   useEffect(() => {
     appVersion().then(setVersion).catch(() => {});
   }, []);
 
   return (
-    <aside className="w-64 h-full bg-white border-r border-aegis-200 flex flex-col">
-      <div className="p-5 border-b border-aegis-200">
+    <aside
+      className={`${
+        collapsed ? "w-16" : "w-64"
+      } h-full bg-white dark:bg-aegis-night-200 border-r border-aegis-200 dark:border-aegis-night-50 flex flex-col transition-all duration-200`}
+    >
+      {/* Brand header */}
+      <div className="p-4 border-b border-aegis-200 dark:border-aegis-night-50">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl overflow-hidden shadow-soft">
+          <div className="h-9 w-9 rounded-xl overflow-hidden shadow-soft flex-shrink-0 ring-1 ring-aegis-200/50 dark:ring-aegis-night-50">
             <img src="/logoapp.png" alt="Aegis AI" className="h-full w-full object-cover" />
           </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-base font-semibold text-aegis-900 truncate">Aegis AI</h1>
-            <p className="text-[11px] text-aegis-500 truncate">v{version}</p>
-          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0 animate-fade-in">
+              <h1 className="text-base font-semibold aegis-gradient-text truncate">
+                Aegis AI
+              </h1>
+              <p className="text-[11px] text-aegis-500 dark:text-aegis-400 truncate">
+                v{version}
+              </p>
+            </div>
+          )}
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 rounded-lg text-aegis-500 hover:bg-aegis-100 dark:hover:bg-aegis-night-50 transition-colors"
+            aria-label={t("nav.sidebar.toggle")}
+            title={t("nav.sidebar.toggle")}
+          >
+            {collapsed ? (
+              <PanelLeft className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </button>
         </div>
       </div>
 
-      <nav className="flex-1 p-3 space-y-1">
-        {NAV.map(({ id, icon: Icon, key }) => {
+      {/* Nav */}
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+        {NAV.map(({ id, icon: Icon, key, badge }) => {
           const active = view === id;
           return (
             <button
               key={id}
               onClick={() => setView(id)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all
+              title={collapsed ? t(key) : undefined}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative
                 ${
                   active
-                    ? "bg-aegis-accent text-white shadow-soft"
-                    : "text-aegis-700 hover:bg-aegis-100"
-                }`}
+                    ? "bg-gradient-accent text-white shadow-soft"
+                    : "text-aegis-700 dark:text-aegis-300 hover:bg-aegis-100 dark:hover:bg-aegis-night-50"
+                }
+                ${collapsed ? "justify-center" : ""}
+              `}
             >
               <Icon className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">{t(key)}</span>
+              {!collapsed && <span className="truncate">{t(key)}</span>}
+              {badge && !collapsed && (
+                <span
+                  className={`ml-auto text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
+                    active
+                      ? "bg-white/20 text-white"
+                      : "bg-aegis-accent/10 text-aegis-accent dark:bg-aegis-accent/20 dark:text-aegis-accentSoft"
+                  }`}
+                >
+                  {badge}
+                </span>
+              )}
+              {badge && collapsed && (
+                <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-aegis-accent animate-pulse-soft" />
+              )}
             </button>
           );
         })}
       </nav>
 
-      <div className="p-3 border-t border-aegis-200">
-        <div className="rounded-lg bg-aegis-50 px-3 py-2.5 text-[11px] text-aegis-500 leading-relaxed">
-          <p className="font-medium text-aegis-700 mb-1">Security-first AI</p>
-          <p>
-            All actions on your machine require explicit confirmation. Your conversations stay
-            on-device.
-          </p>
-        </div>
+      {/* Footer */}
+      <div className="p-2 border-t border-aegis-200 dark:border-aegis-night-50 space-y-1">
+        <button
+          onClick={toggleTheme}
+          title={t("nav.theme.toggle")}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all
+            text-aegis-700 dark:text-aegis-300 hover:bg-aegis-100 dark:hover:bg-aegis-night-50
+            ${collapsed ? "justify-center" : ""}
+          `}
+        >
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4 flex-shrink-0" />
+          ) : (
+            <Moon className="h-4 w-4 flex-shrink-0" />
+          )}
+          {!collapsed && (
+            <span>
+              {theme === "dark" ? t("settings.theme.light") : t("settings.theme.dark")}
+            </span>
+          )}
+        </button>
+
+        {!collapsed && (
+          <div className="rounded-lg bg-gradient-accent-soft px-3 py-2.5 text-[11px] text-aegis-600 dark:text-aegis-300 leading-relaxed">
+            <div className="flex items-center gap-1.5 font-medium text-aegis-700 dark:text-aegis-200 mb-1">
+              <Shield className="h-3 w-3" />
+              Security-first AI
+            </div>
+            <p>
+              All actions on your machine require explicit confirmation. Your
+              conversations stay on-device.
+            </p>
+          </div>
+        )}
       </div>
     </aside>
   );

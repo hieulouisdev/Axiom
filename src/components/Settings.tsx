@@ -1,19 +1,45 @@
 import { useEffect, useState } from "react";
-import { Save, Loader2, AlertTriangle } from "lucide-react";
+import {
+  Save,
+  Loader2,
+  AlertTriangle,
+  Sun,
+  Moon,
+  Download,
+  Trash2,
+  Shield,
+  Database,
+  FileText,
+  Loader,
+} from "lucide-react";
 import { t } from "../i18n";
-import { settingsGet, settingsSet } from "../lib/tauri";
+import {
+  settingsGet,
+  settingsSet,
+  memoryEncryptionStatus,
+  auditExport,
+  memoryExportAll,
+  memoryForgetAll,
+} from "../lib/tauri";
 import { useStore } from "../store";
 import { setLocale as setI18nLocale } from "../i18n";
-import type { SettingsDto } from "../types";
+import type { EncryptionStatus, SettingsDto } from "../types";
 
 export function Settings() {
   const [dto, setDto] = useState<SettingsDto | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [encryption, setEncryption] = useState<EncryptionStatus | null>(null);
+  const [exportingAudit, setExportingAudit] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
+  const [forgetting, setForgetting] = useState(false);
   const setLocale = useStore((s) => s.setLocale);
+  const theme = useStore((s) => s.theme);
+  const setTheme = useStore((s) => s.setTheme);
 
   useEffect(() => {
     settingsGet().then(setDto).catch(() => {});
+    memoryEncryptionStatus().then(setEncryption).catch(() => {});
   }, []);
 
   if (!dto) {
@@ -38,12 +64,78 @@ export function Settings() {
     }
   };
 
+  const downloadJson = (data: unknown, filename: string) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadText = (text: string, filename: string, mime = "text/plain") => {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportAudit = async (format: "json" | "csv") => {
+    setExportingAudit(true);
+    try {
+      const result = await auditExport(10_000, format);
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      if (format === "json") {
+        downloadJson(result, `aegis-audit-${ts}.json`);
+      } else {
+        const csv = (result as { csv?: string }).csv ?? "";
+        downloadText(csv, `aegis-audit-${ts}.csv`, "text/csv");
+      }
+    } catch (e) {
+      alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExportingAudit(false);
+    }
+  };
+
+  const exportAll = async () => {
+    setExportingData(true);
+    try {
+      const result = await memoryExportAll();
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      downloadJson(result, `aegis-export-${ts}.json`);
+    } catch (e) {
+      alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExportingData(false);
+    }
+  };
+
+  const forgetAll = async () => {
+    if (!window.confirm(t("settings.data.forget.confirm"))) return;
+    setForgetting(true);
+    try {
+      await memoryForgetAll();
+      alert("All data wiped.");
+    } catch (e) {
+      alert(`Wipe failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setForgetting(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
-      <header className="px-6 py-4 border-b border-aegis-200 bg-white flex items-center justify-between">
+      <header className="aegis-section-header">
         <div>
-          <h2 className="text-lg font-semibold">{t("settings.title")}</h2>
-          <p className="text-xs text-aegis-500 mt-0.5">
+          <h2 className="text-lg font-semibold text-aegis-900 dark:text-aegis-100">
+            {t("settings.title")}
+          </h2>
+          <p className="text-xs text-aegis-500 dark:text-aegis-400 mt-0.5">
             Persisted to <code className="font-mono">config.toml</code> in your data dir.
           </p>
         </div>
@@ -55,9 +147,44 @@ export function Settings() {
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="max-w-2xl mx-auto space-y-5">
+          {/* Appearance */}
+          <div className="aegis-card p-5">
+            <h3 className="text-sm font-semibold mb-3 text-aegis-900 dark:text-aegis-100">
+              {t("settings.theme")}
+            </h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setTheme("light")}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all
+                  ${
+                    theme === "light"
+                      ? "bg-gradient-accent text-white shadow-soft"
+                      : "bg-white dark:bg-aegis-night-50 border border-aegis-200 dark:border-aegis-night-50 text-aegis-700 dark:text-aegis-300 hover:bg-aegis-50 dark:hover:bg-aegis-night-300"
+                  }`}
+              >
+                <Sun className="h-4 w-4" />
+                {t("settings.theme.light")}
+              </button>
+              <button
+                onClick={() => setTheme("dark")}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all
+                  ${
+                    theme === "dark"
+                      ? "bg-gradient-accent text-white shadow-soft"
+                      : "bg-white dark:bg-aegis-night-50 border border-aegis-200 dark:border-aegis-night-50 text-aegis-700 dark:text-aegis-300 hover:bg-aegis-50 dark:hover:bg-aegis-night-300"
+                  }`}
+              >
+                <Moon className="h-4 w-4" />
+                {t("settings.theme.dark")}
+              </button>
+            </div>
+          </div>
+
           {/* Language */}
           <div className="aegis-card p-5">
-            <h3 className="text-sm font-semibold mb-3">{t("settings.language")}</h3>
+            <h3 className="text-sm font-semibold mb-3 text-aegis-900 dark:text-aegis-100">
+              {t("settings.language")}
+            </h3>
             <div className="flex gap-2">
               {[
                 { id: "en", label: "English" },
@@ -69,24 +196,23 @@ export function Settings() {
                   className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all
                     ${
                       dto.language === l.id
-                        ? "bg-aegis-accent text-white"
-                        : "bg-white border border-aegis-200 text-aegis-700 hover:bg-aegis-50"
+                        ? "bg-gradient-accent text-white"
+                        : "bg-white dark:bg-aegis-night-50 border border-aegis-200 dark:border-aegis-night-50 text-aegis-700 dark:text-aegis-300 hover:bg-aegis-50 dark:hover:bg-aegis-night-300"
                     }`}
                 >
                   {l.label}
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-aegis-400 mt-2">
-              Default: English. Changes apply immediately on Save.
-            </p>
           </div>
 
           {/* Mode */}
           <div className="aegis-card p-5">
-            <h3 className="text-sm font-semibold mb-3">{t("settings.mode")}</h3>
+            <h3 className="text-sm font-semibold mb-3 text-aegis-900 dark:text-aegis-100">
+              {t("settings.mode")}
+            </h3>
             <div className="space-y-2">
-              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-aegis-50 transition-colors">
+              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-aegis-50 dark:hover:bg-aegis-night-50 transition-colors">
                 <input
                   type="radio"
                   checked={dto.mode === "ondemand"}
@@ -94,11 +220,15 @@ export function Settings() {
                   className="mt-1"
                 />
                 <div>
-                  <div className="text-sm font-medium">{t("settings.mode.ondemand")}</div>
-                  <div className="text-xs text-aegis-500 mt-0.5">{t("modes.ondemand.desc")}</div>
+                  <div className="text-sm font-medium text-aegis-900 dark:text-aegis-100">
+                    {t("settings.mode.ondemand")}
+                  </div>
+                  <div className="text-xs text-aegis-500 dark:text-aegis-400 mt-0.5">
+                    {t("modes.ondemand.desc")}
+                  </div>
                 </div>
               </label>
-              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-aegis-50 transition-colors">
+              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-aegis-50 dark:hover:bg-aegis-night-50 transition-colors">
                 <input
                   type="radio"
                   checked={dto.mode === "continuous"}
@@ -106,8 +236,12 @@ export function Settings() {
                   className="mt-1"
                 />
                 <div>
-                  <div className="text-sm font-medium">{t("settings.mode.continuous")}</div>
-                  <div className="text-xs text-aegis-500 mt-0.5">{t("modes.continuous.desc")}</div>
+                  <div className="text-sm font-medium text-aegis-900 dark:text-aegis-100">
+                    {t("settings.mode.continuous")}
+                  </div>
+                  <div className="text-xs text-aegis-500 dark:text-aegis-400 mt-0.5">
+                    {t("modes.continuous.desc")}
+                  </div>
                 </div>
               </label>
             </div>
@@ -115,7 +249,12 @@ export function Settings() {
 
           {/* Security toggles */}
           <div className="aegis-card p-5">
-            <h3 className="text-sm font-semibold mb-3">{t("security.title")}</h3>
+            <div className="flex items-center gap-2 mb-3">
+              <Shield className="h-4 w-4 text-aegis-accent" />
+              <h3 className="text-sm font-semibold text-aegis-900 dark:text-aegis-100">
+                {t("security.title")}
+              </h3>
+            </div>
             <div className="space-y-3">
               <ToggleRow
                 label={t("security.monitor")}
@@ -136,7 +275,7 @@ export function Settings() {
                 onChange={(v) => setDto({ ...dto, scanner_enabled: v })}
               />
               <div>
-                <label className="text-xs text-aegis-700">
+                <label className="text-xs text-aegis-700 dark:text-aegis-300">
                   Quarantine auto-delete after (days)
                 </label>
                 <input
@@ -153,15 +292,39 @@ export function Settings() {
             </div>
           </div>
 
-          {/* Autonomous (dangerous) */}
-          <div className="aegis-card p-5 border-amber-200 bg-amber-50/30">
+          {/* Bypass Mode */}
+          <div className="aegis-card p-5 border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/10">
             <div className="flex items-start gap-2 mb-3">
-              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-sm font-semibold text-amber-900">
+                <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+                  {t("settings.bypass_mode")}
+                </h3>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                  {t("settings.bypass_mode.hint")}
+                </p>
+              </div>
+            </div>
+            <ToggleRow
+              label="Enable bypass mode"
+              desc="Skip confirmation for medium/high-risk actions except hard-deny list."
+              checked={dto.bypass_mode}
+              onChange={(v) => setDto({ ...dto, bypass_mode: v })}
+              danger
+            />
+          </div>
+
+          {/* Autonomous (dangerous) */}
+          <div className="aegis-card p-5 border-red-200 dark:border-red-900/50 bg-red-50/30 dark:bg-red-950/10">
+            <div className="flex items-start gap-2 mb-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-semibold text-red-900 dark:text-red-300">
                   {t("settings.allow_autonomous")}
                 </h3>
-                <p className="text-xs text-amber-700 mt-0.5">{t("settings.allow_autonomous.hint")}</p>
+                <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">
+                  {t("settings.allow_autonomous.hint")}
+                </p>
               </div>
             </div>
             <ToggleRow
@@ -171,6 +334,100 @@ export function Settings() {
               onChange={(v) => setDto({ ...dto, allow_autonomous: v })}
               danger
             />
+          </div>
+
+          {/* Database encryption (Phase 2.5) */}
+          <div className="aegis-card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Database className="h-4 w-4 text-aegis-accent" />
+              <h3 className="text-sm font-semibold text-aegis-900 dark:text-aegis-100">
+                {t("settings.encryption")}
+              </h3>
+            </div>
+            {encryption && (
+              <div className="text-sm">
+                {encryption.status === "not_supported" && (
+                  <p className="text-aegis-500 dark:text-aegis-400">
+                    {t("settings.encryption.not_supported")}
+                  </p>
+                )}
+                {encryption.status === "disabled" && (
+                  <p className="text-aegis-500 dark:text-aegis-400">
+                    {t("settings.encryption.disabled")}
+                  </p>
+                )}
+                {encryption.status === "enabled" && (
+                  <p className="text-emerald-600 dark:text-emerald-400">
+                    {t("settings.encryption.enabled")}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Data & Privacy */}
+          <div className="aegis-card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="h-4 w-4 text-aegis-accent" />
+              <h3 className="text-sm font-semibold text-aegis-900 dark:text-aegis-100">
+                {t("settings.data_privacy")}
+              </h3>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <div className="text-xs text-aegis-500 dark:text-aegis-400 mb-1.5">
+                  {t("settings.audit.export")}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => exportAudit("json")}
+                    disabled={exportingAudit}
+                    className="aegis-btn flex-1"
+                  >
+                    {exportingAudit ? (
+                      <Loader className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    {t("settings.audit.export.json")}
+                  </button>
+                  <button
+                    onClick={() => exportAudit("csv")}
+                    disabled={exportingAudit}
+                    className="aegis-btn flex-1"
+                  >
+                    <Download className="h-4 w-4" />
+                    {t("settings.audit.export.csv")}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={exportAll}
+                disabled={exportingData}
+                className="aegis-btn w-full"
+              >
+                {exportingData ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {t("settings.data.export")}
+              </button>
+
+              <button
+                onClick={forgetAll}
+                disabled={forgetting}
+                className="aegis-btn-danger w-full"
+              >
+                {forgetting ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                {t("settings.data.forget")}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -196,12 +453,14 @@ function ToggleRow({
       <div>
         <div
           className={`text-sm font-medium ${
-            danger ? "text-amber-900" : "text-aegis-800"
+            danger
+              ? "text-amber-900 dark:text-amber-300"
+              : "text-aegis-800 dark:text-aegis-200"
           }`}
         >
           {label}
         </div>
-        <div className="text-xs text-aegis-500">{desc}</div>
+        <div className="text-xs text-aegis-500 dark:text-aegis-400">{desc}</div>
       </div>
       <button
         type="button"

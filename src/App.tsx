@@ -6,6 +6,7 @@ import { Memory } from "./components/Memory";
 import { Security } from "./components/Security";
 import { Settings } from "./components/Settings";
 import { Modes } from "./components/Modes";
+import { Web } from "./components/Web";
 import { useStore } from "./store";
 import { i18nGetLocale, i18nSetLocale, settingsGet } from "./lib/tauri";
 import { setLocale as setI18nLocale } from "./i18n";
@@ -32,10 +33,11 @@ export default function App() {
   }, [setLocale]);
 
   return (
-    <div className="flex h-screen w-screen bg-white text-aegis-900 overflow-hidden">
+    <div className="flex h-screen w-screen bg-aegis-50 dark:bg-aegis-night-500 text-aegis-900 dark:text-aegis-100 overflow-hidden">
       <Sidebar />
-      <main className="flex-1 flex flex-col overflow-hidden bg-aegis-50">
+      <main className="flex-1 flex flex-col overflow-hidden bg-aegis-50 dark:bg-aegis-night-500">
         {view === "chat" && <Chat />}
+        {view === "web" && <Web />}
         {view === "providers" && <Providers />}
         {view === "memory" && <Memory />}
         {view === "security" && <Security />}
