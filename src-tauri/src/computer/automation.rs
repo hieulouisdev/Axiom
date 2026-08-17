@@ -201,7 +201,10 @@ fn parse_key(s: &str) -> Option<enigo::Key> {
         "f11" => Some(Key::F11),
         "f12" => Some(Key::F12),
         "capslock" | "caps_lock" => Some(Key::CapsLock),
-        "scrolllock" | "scroll_lock" => Some(Key::ScrollLock),
+        // Note: enigo 0.2 does not have a ScrollLock variant (NumLock was
+        // already removed in v0.3). Map to None so the caller falls back to
+        // a no-op instead of failing the build.
+        "scrolllock" | "scroll_lock" => None,
         "insert" => Some(Key::Insert),
         "ctrl" | "control" => Some(Key::Control),
         "alt" => Some(Key::Alt),

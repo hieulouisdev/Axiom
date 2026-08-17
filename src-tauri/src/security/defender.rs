@@ -162,13 +162,19 @@ fn process_binary_path(pid: u32) -> Option<String> {
     {
         use windows::Win32::Foundation::CloseHandle;
         use windows::Win32::System::Threading::{
-            OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
+            OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT_WIN32_EXE,
+            PROCESS_QUERY_LIMITED_INFORMATION,
         };
         unsafe {
             let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
             let mut buf = [0u16; 1024];
             let mut len = buf.len() as u32;
-            let ok = QueryFullProcessImageNameW(h, 0, windows::core::PWSTR(buf.as_mut_ptr()), &mut len).is_ok();
+            let ok = QueryFullProcessImageNameW(
+                h,
+                PROCESS_NAME_FORMAT_WIN32_EXE,
+                windows::core::PWSTR(buf.as_mut_ptr()),
+                &mut len,
+            ).is_ok();
             let _ = CloseHandle(h);
             if ok {
                 Some(String::from_utf16_lossy(&buf[..len as usize]).trim_end_matches('\0').to_string())
@@ -196,7 +202,9 @@ fn kill_process(pid: u32) -> std::io::Result<()> {
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{e}")))?;
         let r = TerminateProcess(h, 1).ok();
         let _ = CloseHandle(h);
-        if r.is_err() {
+        // `.ok()` converts Result -> Option, so check `.is_none()` instead
+        // of `.is_err()`.
+        if r.is_none() {
             return Err(std::io::Error::new(std::io::ErrorKind::Other, "TerminateProcess failed"));
         }
         Ok(())

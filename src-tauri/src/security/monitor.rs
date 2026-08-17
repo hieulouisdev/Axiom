@@ -181,7 +181,7 @@ fn sample_processes_inner(out: &mut Vec<ProcessSnapshot>) {
 fn sample_processes_inner(out: &mut Vec<ProcessSnapshot>) {
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32,
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
         TH32CS_SNAPPROCESS,
     };
     use windows::Win32::System::Threading::OpenProcess;
@@ -191,9 +191,12 @@ fn sample_processes_inner(out: &mut Vec<ProcessSnapshot>) {
             Ok(h) => h,
             Err(_) => return,
         };
-        let mut entry: PROCESSENTRY32 = std::mem::zeroed();
-        entry.dwSize = std::mem::size_of::<PROCESSENTRY32>() as u32;
-        if Process32First(snap, &mut entry).is_err() {
+        // Use the wide (Unicode) variant so szExeFile is [u16; 260], which
+        // String::from_utf16_lossy accepts directly. The ANSI PROCESSENTRY32
+        // uses [i8; 260] which doesn't.
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        if Process32FirstW(snap, &mut entry).is_err() {
             let _ = CloseHandle(snap);
             return;
         }
@@ -208,7 +211,7 @@ fn sample_processes_inner(out: &mut Vec<ProcessSnapshot>) {
                 started_at_ms: None,
                 parent_pid: Some(entry.th32ParentProcessID),
             });
-            if Process32Next(snap, &mut entry).is_err() {
+            if Process32NextW(snap, &mut entry).is_err() {
                 break;
             }
         }
