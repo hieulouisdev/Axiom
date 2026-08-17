@@ -25,7 +25,7 @@ const NAV: { id: ViewId; icon: typeof Shield; key: string }[] = [
 export function Sidebar() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
-  const [version, setVersion] = useState("0.1.0");
+  const [version, setVersion] = useState("0.2.0");
 
   useEffect(() => {
     appVersion().then(setVersion).catch(() => {});
@@ -35,8 +35,8 @@ export function Sidebar() {
     <aside className="w-64 h-full bg-white border-r border-aegis-200 flex flex-col">
       <div className="p-5 border-b border-aegis-200">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-aegis-accent to-blue-700 flex items-center justify-center shadow-soft">
-            <Shield className="h-5 w-5 text-white" />
+          <div className="h-9 w-9 rounded-xl overflow-hidden shadow-soft">
+            <img src="/logoapp.png" alt="Aegis AI" className="h-full w-full object-cover" />
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-semibold text-aegis-900 truncate">Aegis AI</h1>

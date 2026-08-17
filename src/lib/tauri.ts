@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AppDescriptor,
   ChatResponseDto,
+  ChatStreamStartDto,
   Conversation,
   ExecResult,
   FileReadResult,
@@ -31,6 +32,26 @@ export const aiChat = (params: {
     },
   });
 
+export const aiChatStream = (params: {
+  conversation_id?: string | null;
+  user_message: string;
+  model?: string | null;
+  temperature?: number | null;
+  max_tokens?: number | null;
+}) =>
+  invoke<ChatStreamStartDto>("ai_chat_stream", {
+    params: {
+      conversation_id: params.conversation_id ?? null,
+      user_message: params.user_message,
+      model: params.model ?? null,
+      temperature: params.temperature ?? null,
+      max_tokens: params.max_tokens ?? null,
+    },
+  });
+
+export const aiChatCancel = (stream_id: string) =>
+  invoke<void>("ai_chat_cancel", { streamId: stream_id });
+
 export const aiListProviders = () => invoke<ProviderDto[]>("ai_list_providers");
 export const aiSetActiveProvider = (provider_id: string | null) =>
   invoke("ai_set_active_provider", { providerId: provider_id });
@@ -59,6 +80,17 @@ export const computerFileWrite = (path: string, content: string, authorized = fa
     params: { path, content, authorized },
   });
 export const computerScreenshot = () => invoke("computer_screenshot");
+export const computerRequestAction = (action: string, summary: string) =>
+  invoke<string>("computer_request_action", { action, summary });
+export const computerConfirmAction = (token: string, action: string) =>
+  invoke<void>("computer_confirm_action", { params: { token, action } });
+
+// ===== Clipboard =====
+export const clipboardRead = () => invoke("clipboard_read_cmd");
+export const clipboardWrite = (text: string) =>
+  invoke<void>("clipboard_write_cmd", { text });
+export const clipboardWatchStart = () => invoke<void>("clipboard_watch_start_cmd");
+export const clipboardWatchStop = () => invoke<void>("clipboard_watch_stop_cmd");
 
 // ===== Memory =====
 export const memoryListConversations = (limit = 50) =>
@@ -69,13 +101,25 @@ export const memoryClearAll = () => invoke<void>("memory_clear_all");
 export const memorySearch = (query: string, limit = 50) =>
   invoke<Message[]>("memory_search", { query, limit });
 export const memoryStats = () => invoke<MemoryStats>("memory_stats");
+export const memorySummarize = (conversation_id: string) =>
+  invoke<string>("memory_summarize", { conversationId: conversation_id });
 
 // ===== Security =====
 export const securityStatus = () => invoke<SecurityStatus>("security_status");
 export const securityScan = (path: string, max_depth = 5) =>
   invoke<ScanResult[]>("security_scan", { path, maxDepth: max_depth });
+export const securityQuarantineList = () =>
+  invoke("security_quarantine_list");
+export const securityRestoreFile = (id: string) =>
+  invoke<void>("security_restore_file", { id });
 export const securitySetAutoDefense = (enabled: boolean) =>
   invoke<void>("security_set_auto_defense", { enabled });
+export const securityIntegrityCheck = () =>
+  invoke("security_integrity_check");
+export const securityIntegritySaveBaseline = () =>
+  invoke("security_integrity_save_baseline");
+export const securityNetworkScan = () =>
+  invoke("security_network_scan");
 
 // ===== Modes =====
 export const modesGetActive = () => invoke<"continuous" | "ondemand">("modes_get_active");

@@ -1,5 +1,6 @@
 //! Global application state shared across Tauri command handlers.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -9,6 +10,7 @@ use crate::{
     ai::{provider::ProviderRegistry as AiProviderRegistry, router::AiRouter},
     config::{AppConfig, ConfigStore},
     memory::store::MemoryStore,
+    security::quarantine::QuarantineStore,
 };
 
 /// Top-level container holding live handles to every backend subsystem.
@@ -33,6 +35,17 @@ pub struct AppState {
 
     /// Handle to the running Tauri application (set during boot).
     pub app_handle: Mutex<Option<AppHandle>>,
+
+    /// Cancel tokens for streaming chat requests.
+    /// Maps stream_id → watch sender (send true to cancel).
+    pub cancel_tokens: Mutex<HashMap<String, tokio::sync::watch::Sender<bool>>>,
+
+    /// Pending actions awaiting user confirmation.
+    /// Maps token → PendingAction (with 60-second TTL).
+    pub pending_actions: Mutex<HashMap<String, crate::commands::PendingAction>>,
+
+    /// File quarantine store (lifted from defender task to AppState in Phase 2).
+    pub quarantine: Mutex<QuarantineStore>,
 }
 
 impl AppState {
@@ -58,6 +71,9 @@ impl AppState {
             router,
             memory: Arc::new(memory),
             app_handle: Mutex::new(None),
+            cancel_tokens: Mutex::new(HashMap::new()),
+            pending_actions: Mutex::new(HashMap::new()),
+            quarantine: Mutex::new(QuarantineStore::new()),
         }))
     }
 
@@ -84,12 +100,20 @@ impl AppState {
         // Replace the in-memory store with the persistent one.
         {
             let mut s = state.lock();
-            // SAFETY: we are the only holder at boot time.
-            // Use Arc::get_mut to swap; if it fails (refs exist), fall back.
             if let Some(mem_arc) = Arc::get_mut(&mut s.memory) {
                 *mem_arc = memory;
             } else {
                 tracing::warn!("could not swap memory store — keeping in-memory");
+            }
+        }
+
+        // Load integrity baselines from DB
+        {
+            let s = state.lock();
+            let conn = s.memory.shared_conn();
+            let conn = conn.lock();
+            if let Err(e) = crate::security::integrity::load_baselines_from_db(&conn) {
+                tracing::warn!("failed to load integrity baselines: {e}");
             }
         }
 
@@ -122,6 +146,21 @@ impl AppState {
                     tracing::error!("auto-defense watcher exited with error: {e:#}");
                 }
             });
+        }
+
+        // Save initial integrity baseline if none exists
+        {
+            let baselines = crate::security::integrity::critical_files();
+            if !baselines.is_empty() {
+                if let Ok(saved) = crate::security::integrity::save_baseline() {
+                    tracing::info!("saved integrity baseline for {} files", saved.len());
+                    // Persist to DB
+                    let s = state.lock();
+                    let conn = s.memory.shared_conn();
+                    let conn = conn.lock();
+                    let _ = crate::security::integrity::save_baselines_to_db(&conn);
+                }
+            }
         }
 
         Ok(())

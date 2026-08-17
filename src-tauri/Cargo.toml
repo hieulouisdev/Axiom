@@ -25,6 +25,9 @@ tauri-plugin-dialog = "2.0"
 tauri-plugin-notification = "2.0"
 tauri-plugin-store = "2.0"
 tauri-plugin-clipboard-manager = "2.0"
+tauri-plugin-autostart = "2.0"
+tauri-plugin-global-shortcut = "2.0"
+tauri-plugin-process = "2.0"
 
 # Core async / serialization
 tokio = { workspace = true }
@@ -61,6 +64,31 @@ futures = "0.3"
 bytes = "1.9"
 base64 = "0.22"
 url = "2.5"
+
+# Phase 2: GUI automation
+enigo = "0.2"
+
+# Phase 2: Screen capture
+screenshots = "0.2"
+
+# Phase 2: OCR
+rusty-tesseract = "1.1"
+
+# Phase 2: OS keychain for credential storage
+keyring = "2"
+
+# Phase 2: AWS SigV4 for Bedrock
+aws-sigv4 = "1.2"
+aws-credential-types = "1.2"
+
+# Phase 2: File watcher
+notify = "6"
+
+# Phase 2: Process/network info
+procfs = "0.16"
+
+# Phase 2: HTTP types for AWS SigV4
+http = "1.1"
 
 # Platform-specific
 [target.'cfg(unix)'.dependencies]

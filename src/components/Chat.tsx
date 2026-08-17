@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { Send, Plus, AlertTriangle, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Send, Plus, AlertTriangle, Loader2, Square } from "lucide-react";
 import { useStore } from "../store";
 import { t } from "../i18n";
-import { aiChat, memoryGetConversation } from "../lib/tauri";
+import { aiChat, aiChatStream, aiChatCancel, memoryGetConversation } from "../lib/tauri";
+import { listen } from "@tauri-apps/api/event";
 import type { Message } from "../types";
 
 interface ChatMessage {
@@ -15,13 +16,71 @@ export function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [streamId, setStreamId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const unlistenRefs = useRef<Function[]>([]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  // Set up event listeners for streaming
+  useEffect(() => {
+    const setupListeners = async () => {
+      const unlistenChunk = await listen<{ stream_id: string; delta: string; done: boolean }>(
+        "chat://chunk",
+        (event) => {
+          if (event.payload.done) return;
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.role === "assistant") {
+              return [...prev.slice(0, -1), { ...last, content: last.content + event.payload.delta }];
+            }
+            return [...prev, { role: "assistant", content: event.payload.delta }];
+          });
+        }
+      );
+
+      const unlistenDone = await listen<{ stream_id: string }>(
+        "chat://done",
+        () => {
+          setStreaming(false);
+          setLoading(false);
+          setStreamId(null);
+        }
+      );
+
+      const unlistenError = await listen<{ stream_id: string; error: string }>(
+        "chat://error",
+        (event) => {
+          setError(event.payload.error);
+          setStreaming(false);
+          setLoading(false);
+          setStreamId(null);
+        }
+      );
+
+      const unlistenCancelled = await listen<{ stream_id: string }>(
+        "chat://cancelled",
+        () => {
+          setStreaming(false);
+          setLoading(false);
+          setStreamId(null);
+        }
+      );
+
+      unlistenRefs.current = [unlistenChunk, unlistenDone, unlistenError, unlistenCancelled];
+    };
+
+    setupListeners();
+
+    return () => {
+      unlistenRefs.current.forEach((unlisten) => unlisten());
+    };
+  }, []);
 
   const send = async () => {
     const text = input.trim();
@@ -32,15 +91,29 @@ export function Chat() {
     setLoading(true);
 
     try {
-      const resp = await aiChat({
-        conversation_id: conversationId,
-        user_message: text,
-      });
-      setConversationId(resp.conversation_id);
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: resp.content, model: resp.model },
-      ]);
+      // Try streaming first, fall back to regular chat
+      try {
+        const result = await aiChatStream({
+          conversation_id: conversationId,
+          user_message: text,
+        });
+        setConversationId(result.conversation_id);
+        setStreamId(result.stream_id);
+        setStreaming(true);
+        setMessages((m) => [...m, { role: "assistant", content: "" }]);
+      } catch {
+        // Fallback to non-streaming
+        const resp = await aiChat({
+          conversation_id: conversationId,
+          user_message: text,
+        });
+        setConversationId(resp.conversation_id);
+        setMessages((m) => [
+          ...m,
+          { role: "assistant", content: resp.content, model: resp.model },
+        ]);
+        setLoading(false);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
@@ -51,15 +124,30 @@ export function Chat() {
           content: `⚠️ ${t("chat.error_no_provider")}\n\nTechnical detail: ${msg}`,
         },
       ]);
-    } finally {
       setLoading(false);
     }
   };
+
+  const stopGeneration = useCallback(async () => {
+    if (streamId) {
+      try {
+        await aiChatCancel(streamId);
+      } catch {
+        // Stream may already be done
+      }
+      setStreaming(false);
+      setLoading(false);
+      setStreamId(null);
+    }
+  }, [streamId]);
 
   const newConversation = () => {
     setMessages([]);
     setConversationId(null);
     setError(null);
+    setStreamId(null);
+    setStreaming(false);
+    setLoading(false);
   };
 
   return (
@@ -85,7 +173,7 @@ export function Chat() {
             {messages.map((m, i) => (
               <Bubble key={i} message={m} />
             ))}
-            {loading && (
+            {loading && !streaming && (
               <div className="flex items-center gap-2 text-sm text-aegis-500 px-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 {t("chat.thinking")}
@@ -117,14 +205,24 @@ export function Chat() {
             rows={1}
             className="flex-1 resize-none px-2 py-1.5 text-sm bg-transparent focus:outline-none placeholder:text-aegis-400 max-h-40"
           />
-          <button
-            onClick={send}
-            disabled={!input.trim() || loading}
-            className="aegis-btn-primary !p-2"
-            aria-label={t("chat.send")}
-          >
-            <Send className="h-4 w-4" />
-          </button>
+          {streaming ? (
+            <button
+              onClick={stopGeneration}
+              className="aegis-btn !bg-red-500 !text-white !p-2 hover:!bg-red-600"
+              aria-label="Stop generation"
+            >
+              <Square className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              onClick={send}
+              disabled={!input.trim() || loading}
+              className="aegis-btn-primary !p-2"
+              aria-label={t("chat.send")}
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <p className="text-[11px] text-aegis-400 mt-1.5 text-center">
           Press Enter to send · Shift+Enter for newline

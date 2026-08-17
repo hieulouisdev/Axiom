@@ -14,8 +14,11 @@
     "core:window:allow-set-title",
     "core:webview:default",
     "core:event:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
     "core:app:default",
     "core:path:default",
+    "core:tray:default",
     "shell:allow-open",
     "shell:allow-execute",
     "fs:default",
@@ -32,6 +35,17 @@
     "dialog:allow-ask",
     "notification:default",
     "notification:allow-notify",
-    "store:default"
+    "store:default",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-read",
+    "clipboard-manager:allow-write",
+    "autostart:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled",
+    "global-shortcut:default",
+    "process:default",
+    "process:allow-restart",
+    "process:allow-exit"
   ]
 }

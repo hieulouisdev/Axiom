@@ -237,38 +237,98 @@ impl Provider for OpenAiCompatProvider {
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct OpenAiChatResponse {
-    model: String,
-    choices: Vec<OpenAiChoice>,
-    #[serde(default)]
-    usage: Option<OpenAiUsage>,
+/// Parse an SSE stream from an OpenAI-compatible API.
+/// Public so other providers (e.g. Azure OpenAI) can reuse it.
+pub async fn parse_sse_stream(
+    resp: reqwest::Response,
+    on_chunk: Box<dyn Fn(ChatStreamChunk) + Send + Sync>,
+) -> Result<ChatResponse> {
+    let mut full = String::new();
+    let mut model = String::new();
+    let mut final_usage: Option<Usage> = None;
+    let mut buf = String::new();
+
+    let mut stream = resp.bytes_stream();
+    use futures::StreamExt;
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
+        buf.push_str(&String::from_utf8_lossy(&chunk));
+        while let Some(idx) = buf.find('\n') {
+            let line: String = buf.drain(..=idx).collect();
+            let line = line.trim();
+            if line.is_empty() || !line.starts_with("data:") {
+                continue;
+            }
+            let data = &line[5..].trim_start();
+            if data == "[DONE]" {
+                on_chunk(ChatStreamChunk { delta: String::new(), done: true });
+                continue;
+            }
+            if let Ok(parsed) = serde_json::from_str::<OpenAiChatResponse>(data) {
+                if model.is_empty() {
+                    model = parsed.model.clone();
+                }
+                if let Some(choice) = parsed.choices.first() {
+                    if let Some(delta) = choice.delta.as_ref() {
+                        if let Some(content) = delta.content.as_ref() {
+                            full.push_str(content);
+                            on_chunk(ChatStreamChunk {
+                                delta: content.clone(),
+                                done: false,
+                            });
+                        }
+                    }
+                }
+                if let Some(u) = parsed.usage {
+                    final_usage = Some(Usage {
+                        prompt_tokens: u.prompt_tokens,
+                        completion_tokens: u.completion_tokens,
+                        total_tokens: u.total_tokens,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(ChatResponse {
+        message: ChatMessage::assistant(full),
+        model,
+        usage: final_usage,
+    })
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenAiChoice {
+pub struct OpenAiChatResponse {
+    pub model: String,
+    pub choices: Vec<OpenAiChoice>,
     #[serde(default)]
-    message: OpenAiMessage,
+    pub usage: Option<OpenAiUsage>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OpenAiChoice {
     #[serde(default)]
-    delta: Option<OpenAiMessage>,
+    pub message: OpenAiMessage,
+    #[serde(default)]
+    pub delta: Option<OpenAiMessage>,
 }
 
 #[derive(Debug, Default, Deserialize)]
-struct OpenAiMessage {
+pub struct OpenAiMessage {
     #[serde(default)]
-    content: String,
+    pub content: String,
     #[serde(default)]
-    tool_calls: Option<serde_json::Value>,
+    pub tool_calls: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenAiUsage {
+pub struct OpenAiUsage {
     #[serde(default)]
-    prompt_tokens: u32,
+    pub prompt_tokens: u32,
     #[serde(default)]
-    completion_tokens: u32,
+    pub completion_tokens: u32,
     #[serde(default)]
-    total_tokens: u32,
+    pub total_tokens: u32,
 }
 
 /// Helper to declare a provider descriptor.

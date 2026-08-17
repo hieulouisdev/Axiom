@@ -8,6 +8,7 @@
 
 pub mod continuous;
 pub mod ondemand;
+pub mod watcher;
 
 use serde::{Deserialize, Serialize};
 

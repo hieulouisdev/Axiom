@@ -58,7 +58,8 @@ impl MemoryStore {
                 title           TEXT NOT NULL,
                 provider_id     TEXT,
                 created_at_ms   INTEGER NOT NULL,
-                updated_at_ms   INTEGER NOT NULL
+                updated_at_ms   INTEGER NOT NULL,
+                summary         TEXT
             );
 
             CREATE TABLE IF NOT EXISTS messages (
@@ -101,6 +102,12 @@ impl MemoryStore {
                 created_at_ms   INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at_ms);
+
+            CREATE TABLE IF NOT EXISTS integrity_baselines (
+                path            TEXT PRIMARY KEY,
+                hash_sha256     TEXT NOT NULL,
+                saved_at_ms     INTEGER NOT NULL
+            );
             "#,
         )?;
         Ok(())

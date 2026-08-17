@@ -1,4 +1,6 @@
 //! Conversation history store.
+//!
+//! Phase 2: Added summarization support.
 
 use std::sync::Arc;
 
@@ -17,6 +19,9 @@ pub struct Conversation {
     pub provider_id: Option<String>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
+    /// Optional summary of the conversation (for context pruning).
+    #[serde(default)]
+    pub summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +57,7 @@ impl ConversationStore {
             provider_id: provider_id.map(Into::into),
             created_at_ms: now,
             updated_at_ms: now,
+            summary: None,
         })
     }
 
@@ -67,6 +73,7 @@ impl ConversationStore {
                 provider_id: row.get(2)?,
                 created_at_ms: row.get::<_, i64>(3)? as u64,
                 updated_at_ms: row.get::<_, i64>(4)? as u64,
+                summary: None,
             })
         })?;
         let mut out = Vec::new();
@@ -155,6 +162,59 @@ impl ConversationStore {
             out.push(r?);
         }
         Ok(out)
+    }
+
+    /// Store a summary for a conversation.
+    pub fn set_summary(&self, conversation_id: &str, summary: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        // Add summary column if it doesn't exist
+        let _ = conn.execute_batch("ALTER TABLE conversations ADD COLUMN summary TEXT");
+        conn.execute(
+            "UPDATE conversations SET summary = ?1 WHERE id = ?2",
+            params![summary, conversation_id],
+        )?;
+        Ok(())
+    }
+
+    /// Get the summary for a conversation.
+    pub fn get_summary(&self, conversation_id: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock();
+        let _ = conn.execute_batch("ALTER TABLE conversations ADD COLUMN summary TEXT");
+        let mut stmt = conn.prepare(
+            "SELECT summary FROM conversations WHERE id = ?1"
+        )?;
+        let mut rows = stmt.query(params![conversation_id])?;
+        if let Some(row) = rows.next()? {
+            Ok(row.get(0)?)
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Prune old messages from a conversation, keeping only the N most recent.
+    /// Returns the number of messages pruned.
+    pub fn prune_old_messages(&self, conversation_id: &str, keep_count: u32) -> Result<u32> {
+        let conn = self.conn.lock();
+        // Delete all but the most recent `keep_count` messages
+        let result = conn.execute(
+            "DELETE FROM messages WHERE conversation_id = ?1 AND id NOT IN (
+                SELECT id FROM messages WHERE conversation_id = ?1
+                ORDER BY created_at_ms DESC LIMIT ?2
+            )",
+            params![conversation_id, keep_count as i64],
+        )?;
+        Ok(result as u32)
+    }
+
+    /// Get the number of messages in a conversation.
+    pub fn message_count(&self, conversation_id: &str) -> Result<u32> {
+        let conn = self.conn.lock();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM messages WHERE conversation_id = ?1",
+            params![conversation_id],
+            |row| row.get(0),
+        )?;
+        Ok(count as u32)
     }
 }
 

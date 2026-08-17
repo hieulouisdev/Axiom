@@ -82,65 +82,66 @@ hashes — but every subsystem exists and is wired end-to-end.
 **Goal:** Replace every stub with a real implementation. The app should be
 usable as a daily AI assistant, not just a skeleton.
 
+**Status:** Released as `Aegis AI v0.2`.
+
 ### 2.1 Streaming chat over Tauri events
 
-- [ ] Expose `ai_chat_stream` as a true streaming command that emits
+- [x] Expose `ai_chat_stream` as a true streaming command that emits
       `chat://chunk` events to the frontend.
-- [ ] Frontend Chat component renders incremental deltas.
-- [ ] Add a "Stop generation" button that cancels the underlying `reqwest`
+- [x] Frontend Chat component renders incremental deltas.
+- [x] Add a "Stop generation" button that cancels the underlying `reqwest`
       future via a `CancellationToken`.
 
 ### 2.2 Full computer-use agent
 
-- [ ] Replace `computer/automation.rs` stubs with `enigo` for cross-platform
+- [x] Replace `computer/automation.rs` stubs with `enigo` for cross-platform
       mouse/keyboard.
-- [ ] Implement `computer/screen.rs` with the `screenshots` crate for capture
-      and `tesseract-rs` for OCR.
-- [ ] Wire a "tool-use" loop: AI proposes an action → safety policy evaluates
+- [x] Implement `computer/screen.rs` with the `screenshots` crate for capture
+      and `rusty-tesseract` for OCR.
+- [x] Wire a "tool-use" loop: AI proposes an action → safety policy evaluates
       → user confirms → action runs → result fed back to AI.
-- [ ] Add a `confirm_action` Tauri command backed by a token table
+- [x] Add a `confirm_action` Tauri command backed by a token table
       (`HashMap<String, PendingAction>`) with 60-second expiry.
 
 ### 2.3 Real antivirus integration
 
-- [ ] Linux: detect `clamdscan` on PATH; if present, delegate file scans
+- [x] Linux: detect `clamdscan` on PATH; if present, delegate file scans
       to ClamAV (huge signature DB).
-- [ ] Windows: invoke `MpManagerStartScan` via the Defender API
-      (requires `MpClient.dll` FFI).
-- [ ] Load ClamAV-style daily.cvd / main.cvd signature files into the local
+- [x] Windows: invoke `MpCmdRun` via the Defender CLI.
+- [x] Load ClamAV-style daily.cvd / main.cvd signature files into the local
       hash store when ClamAV is absent.
 - [ ] Implement YARA rule loading (Phase 2.5 if time permits).
 
 ### 2.4 Cloud provider finishing touches
 
-- [ ] Azure OpenAI: AAD token + `api-version` query param + deployment-id model.
-- [ ] AWS Bedrock: SigV4 request signing with `aws-sigv4` crate.
-- [ ] Replicate: implement the async Prediction API (POST /v1/predictions
+- [x] Azure OpenAI: AAD token + `api-version` query param + deployment-id model.
+- [x] AWS Bedrock: SigV4 request signing with `aws-sigv4` crate.
+- [x] Replicate: implement the async Prediction API (POST /v1/predictions
       → poll until `succeeded` / `failed` → return output).
 
 ### 2.5 Persistence upgrade
 
-- [ ] Move credentials out of `config.toml` into the OS keychain
+- [x] Move credentials out of `config.toml` into the OS keychain
       (`keyring` crate on Linux / Windows Credential Manager).
 - [ ] Encrypt the SQLite database at rest with SQLCipher (opt-in).
-- [ ] Implement conversation summarization (using the configured AI) to
+- [x] Implement conversation summarization (using the configured AI) to
       compress long histories into a compact context.
 
 ### 2.6 Better security signals
 
-- [ ] Network anomaly detector: enumerate listening sockets via
+- [x] Network anomaly detector: enumerate listening sockets via
       `procfs` (Linux) / `GetExtendedTcpTable` (Windows).
-- [ ] File integrity monitor: SHA-256 hash of `~/.bashrc`, `~/.ssh/authorized_keys`,
+- [x] File integrity monitor: SHA-256 hash of `~/.bashrc`, `~/.ssh/authorized_keys`,
       `~/.config/autostart/` and Windows Run keys.
-- [ ] Email/webhook alerts for critical threats.
+- [x] Email/webhook alerts for critical threats.
 
 ### Phase 2 exit criteria
 
-- [ ] Real mouse-click through the AI (a test that types "open notepad"
+- [x] Real mouse-click through the AI (a test that types "open notepad"
       results in Notepad launching on Windows).
-- [ ] ClamAV scan of the EICAR test file flags it as infected.
-- [ ] Azure OpenAI and Bedrock return real chat completions.
-- [ ] Credentials never appear in plaintext on disk.
+- [x] ClamAV scan of the EICAR test file flags it as infected.
+- [x] Azure OpenAI and Bedrock return real chat completions.
+- [x] Credentials never appear in plaintext on disk.
 
 ---
 

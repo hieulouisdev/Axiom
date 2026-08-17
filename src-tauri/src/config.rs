@@ -95,6 +95,12 @@ pub struct SecurityConfig {
     /// List of patterns that, if matched by any process, trigger an alert.
     #[serde(default)]
     pub threat_signatures: Vec<ThreatSignature>,
+    /// Webhook URL for security alerts.
+    #[serde(default)]
+    pub alert_webhook_url: Option<String>,
+    /// Email address for security alerts.
+    #[serde(default)]
+    pub alert_email_to: Option<String>,
 }
 
 impl Default for SecurityConfig {
@@ -111,6 +117,8 @@ impl Default for SecurityConfig {
             ],
             write_path_whitelist: vec!["~/Documents/AegisAI/".into()],
             threat_signatures: ThreatSignature::default_list(),
+            alert_webhook_url: None,
+            alert_email_to: None,
         }
     }
 }
@@ -260,5 +268,69 @@ impl ConfigStore {
     pub fn persist(&self) -> Result<()> {
         let snapshot = self.0.read().clone();
         snapshot.save()
+    }
+}
+
+// ===========================================================================
+// OS Keychain integration for credential storage
+// ===========================================================================
+
+/// Store a credential securely in the OS keychain.
+/// Falls back to config.toml if keyring is unavailable.
+pub fn store_credential_secure(provider_id: &str, api_key: &str) -> Result<()> {
+    match keyring::Entry::new("aegis-ai", provider_id) {
+        Ok(entry) => {
+            match entry.set_password(api_key) {
+                Ok(()) => {
+                    tracing::debug!("stored credential for {} in OS keychain", provider_id);
+                    Ok(())
+                }
+                Err(e) => {
+                    tracing::warn!("keychain write failed for {}: {e}, falling back to config", provider_id);
+                    // Fallback: the caller will store in config.toml
+                    Err(anyhow::anyhow!("keychain write failed: {e}"))
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("keyring entry creation failed for {}: {e}", provider_id);
+            Err(anyhow::anyhow!("keyring entry failed: {e}"))
+        }
+    }
+}
+
+/// Retrieve a credential from the OS keychain.
+/// Returns None if not found in keychain (caller should check config).
+pub fn get_credential_secure(provider_id: &str) -> Option<String> {
+    match keyring::Entry::new("aegis-ai", provider_id) {
+        Ok(entry) => {
+            match entry.get_password() {
+                Ok(password) => Some(password),
+                Err(_) => None,
+            }
+        }
+        Err(_) => None,
+    }
+}
+
+/// Delete a credential from the OS keychain.
+pub fn delete_credential_secure(provider_id: &str) -> Result<()> {
+    match keyring::Entry::new("aegis-ai", provider_id) {
+        Ok(entry) => {
+            match entry.delete_credential() {
+                Ok(()) => {
+                    tracing::debug!("deleted credential for {} from OS keychain", provider_id);
+                    Ok(())
+                }
+                Err(e) => {
+                    tracing::debug!("keychain delete for {} failed (may not exist): {e}", provider_id);
+                    Ok(()) // Not an error if it doesn't exist
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("keyring entry creation failed for {}: {e}", provider_id);
+            Ok(()) // Not an error
+        }
     }
 }

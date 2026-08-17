@@ -108,10 +108,31 @@ export interface ScanResult {
   error: string | null;
 }
 
+export interface ChatStreamStartDto {
+  stream_id: string;
+  conversation_id: string;
+}
+
+export interface NetworkAnomaly {
+  kind: string;
+  detail: string;
+  severity: "info" | "low" | "medium" | "high" | "critical";
+  timestamp_ms: number;
+}
+
+export interface IntegrityEvent {
+  path: string;
+  event_kind: string;
+  expected_hash: string | null;
+  actual_hash: string | null;
+  timestamp_ms: number;
+}
+
 export interface SecurityStatus {
   auto_defense: boolean;
   monitor: boolean;
   scanner_enabled: boolean;
   recent_threats: Threat[];
   recent_events: unknown[];
+  network_anomalies: NetworkAnomaly[];
 }
