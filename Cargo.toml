@@ -1,0 +1,63 @@
+[workspace]
+resolver = "2"
+members = ["src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.97.1"
+authors = ["Aegis AI Contributors"]
+license = "MIT"
+repository = "https://github.com/hieulouisdev/Axiom"
+homepage = "https://github.com/hieulouisdev/Axiom"
+documentation = "https://github.com/hieulouisdev/Axiom#readme"
+keywords = ["ai", "assistant", "desktop", "agent", "security"]
+categories = ["gui", "security", "api-bindings"]
+description = "Aegis AI — secure, cross-platform AI assistant with computer-use, memory, and auto-defense."
+
+[workspace.dependencies]
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Async runtime
+tokio = { version = "1.42", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging / tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+
+# Database
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Time / UUID
+time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
+
+# Crypto / hashing
+sha2 = "0.10"
+hex = "0.4"
+ring = "0.17"
+
+# Configuration
+directories = "5.0"
+toml = "0.8"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+incremental = true

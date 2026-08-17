@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #ffffff;
+    color: #0f172a;
+    overflow: hidden;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 4px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+  }
+}
+
+@layer components {
+  .aegis-card {
+    @apply bg-white border border-aegis-200 rounded-xl shadow-card;
+  }
+
+  .aegis-btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+           bg-white border border-aegis-200 text-aegis-800 hover:bg-aegis-50 hover:border-aegis-300
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .aegis-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+           bg-aegis-accent text-white hover:bg-aegis-accentHover
+           disabled:opacity-50 disabled:cursor-not-allowed border border-transparent;
+  }
+
+  .aegis-btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+           bg-aegis-danger text-white hover:bg-red-700
+           disabled:opacity-50 disabled:cursor-not-allowed border border-transparent;
+  }
+
+  .aegis-input {
+    @apply w-full px-3 py-2 rounded-lg text-sm bg-white border border-aegis-200
+           text-aegis-800 placeholder:text-aegis-400
+           focus:outline-none focus:ring-2 focus:ring-aegis-accent/20 focus:border-aegis-accent
+           transition-all;
+  }
+
+  .aegis-toggle {
+    @apply relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200
+           focus:outline-none focus:ring-2 focus:ring-aegis-accent/30;
+  }
+  .aegis-toggle[data-checked="true"] {
+    @apply bg-aegis-accent;
+  }
+  .aegis-toggle[data-checked="false"] {
+    @apply bg-aegis-300;
+  }
+  .aegis-toggle .aegis-toggle-knob {
+    @apply inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200;
+  }
+  .aegis-toggle[data-checked="true"] .aegis-toggle-knob {
+    @apply translate-x-4;
+  }
+  .aegis-toggle[data-checked="false"] .aegis-toggle-knob {
+    @apply translate-x-0.5;
+  }
+
+  .aegis-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium;
+  }
+  .aegis-badge-info { @apply bg-blue-50 text-blue-700; }
+  .aegis-badge-low { @apply bg-emerald-50 text-emerald-700; }
+  .aegis-badge-medium { @apply bg-amber-50 text-amber-700; }
+  .aegis-badge-high { @apply bg-orange-50 text-orange-700; }
+  .aegis-badge-critical { @apply bg-red-50 text-red-700; }
+}

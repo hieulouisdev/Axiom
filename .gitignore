@@ -1,0 +1,50 @@
+# Rust / Cargo
+/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Tauri
+/src-tauri/target/
+/src-tauri/gen/schemas/
+
+# Node / Frontend
+/node_modules/
+/dist/
+/.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Database / local state
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+aegis_data/
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+*.app
+*.exe
+*.msi
+*.dmg
+*.AppImage
+*.deb
+
+# Tauri icons cache
+/src-tauri/icons/.cache/

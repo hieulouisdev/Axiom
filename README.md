@@ -1,0 +1,178 @@
+# Aegis AI
+
+**Secure cross-platform AI assistant with computer-use, persistent memory, and built-in auto-defense.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.97.1-orange.svg)](https://www.rust-lang.org)
+[![Tauri](https://img.shields.io/badge/Tauri-2.0-orange.svg)](https://tauri.app)
+[![Phase](https://img.shields.io/badge/Phase-1%20Foundation-yellow.svg)](ROADMAP.md)
+
+> **Current release:** v0.1 — Phase 1 foundation skeleton. See the
+> [Roadmap](ROADMAP.md) for what's implemented vs. planned.
+
+## What is Aegis AI?
+
+Aegis AI is a desktop application (Linux + Windows) that lets you connect to
+**20+ AI providers** from many sources — cloud (OpenAI, Anthropic, Gemini,
+DeepSeek, Groq, Mistral, Cohere, Together, Anyscale, Azure OpenAI, AWS
+Bedrock, HuggingFace, Replicate, Moonshot, Zhipu, Yi, DeepInfra, Fireworks),
+local (Ollama, LM Studio, LocalAI, llama.cpp, GPT4All, Jan, KoboldCpp, vLLM,
+Llamafile), and custom (any OpenAI-compat / Anthropic-compat / Ollama-compat
+endpoint, or a generic webhook).
+
+Beyond chat, Aegis AI can **act on your computer** — open apps, read/write
+files, run shell commands, automate the GUI (mouse/keyboard), and capture
+the screen — but only with explicit consent for anything risky.
+
+It also runs a **passive security monitor** that watches for malicious
+processes, and when a threat is detected it can **auto-wake** (even in
+on-demand mode) to quarantine files and kill the offending process. The
+user can review every defensive action and undo it.
+
+Everything is stored locally in a **SQLite database** — conversations,
+activity log, and a selective knowledge base the AI uses to remember things
+about you across sessions.
+
+The UI is clean, white-themed, and supports **English (default)** and
+**Vietnamese**, switchable from Settings at any time.
+
+## Highlights
+
+- **20+ AI providers** with a uniform `Provider` trait; switching is one click.
+- **Two cost modes**: Continuous (always on) or On-demand (wake-on-call) —
+  the security monitor runs in both.
+- **Safety-first computer use**: every potentially destructive action flows
+  through a 5-level risk classifier and requires confirmation.
+- **Auto-defense**: passive process monitor → threat signature matching →
+  quarantine + kill, with full audit trail.
+- **Persistent memory**: SQLite-backed conversations, activities, knowledge.
+- **Privacy**: data stays on your device. No telemetry. No cloud sync.
+- **Bilingual UI**: English and Vietnamese.
+
+## Project structure
+
+```
+aegis-ai/
+├── src-tauri/                # Rust backend
+│   └── src/
+│       ├── ai/               # Provider trait + 20+ provider impls
+│       ├── computer/         # Apps, files, commands, automation, screen, safety
+│       ├── security/         # Monitor, network, scanner, defender, quarantine
+│       ├── memory/           # SQLite store: conversation, activity, knowledge
+│       ├── modes/            # Continuous / on-demand
+│       ├── i18n/             # EN/VI translation table
+│       ├── config.rs         # Persisted app configuration
+│       ├── state.rs          # Global app state
+│       ├── commands.rs       # 25+ Tauri IPC commands
+│       └── error.rs          # Unified error type
+├── src/                      # React frontend (TypeScript + Tailwind)
+│   ├── components/           # Sidebar, Chat, Providers, Memory, Security, Modes, Settings
+│   ├── i18n/                 # Frontend translation tables
+│   ├── lib/tauri.ts          # Tauri API wrappers
+│   ├── store/                # Zustand global store
+│   └── types/                # TypeScript types
+├── docs/                     # Architecture, providers, safety docs
+├── ROADMAP.md                # 4-phase development plan
+├── PRIVACY.md                # Privacy policy
+├── SECURITY.md               # Security policy + reporting
+└── LICENSE                   # MIT
+```
+
+## Quick start (development)
+
+### Prerequisites
+
+- Rust 1.97.1 (pinned via `rust-toolchain.toml`)
+- Node.js 20+ and npm
+- Tauri 2 system dependencies:
+  - **Linux**: `webkit2gtk-4.1`, `libgtk-3-dev`, `librsvg2-dev`, `libssl-dev`
+  - **Windows**: WebView2 runtime (pre-installed on Windows 11)
+
+### Build & run
+
+```bash
+git clone https://github.com/hieulouisdev/Axiom.git
+cd Axiom
+npm install
+npm run tauri:dev    # launches the dev window with hot reload
+```
+
+### Build a release bundle
+
+```bash
+npm run tauri:build  # produces .deb / .AppImage (Linux) or .msi / .exe (Windows)
+```
+
+Output is placed in `src-tauri/target/release/bundle/`.
+
+## Usage
+
+1. **Add a provider.** Open **AI Providers** → click **Configure** on
+   any provider → enter your API key (and optionally a base URL / model) →
+   click **Test connection** → click **Set as active**.
+
+2. **Pick a mode.** Open **Modes** → choose **Continuous** (always on,
+   higher cost) or **On-demand** (cheapest, AI dormant until you chat).
+
+3. **Chat.** Go to **Chat** → type a message → press Enter.
+
+4. **Review security.** Open **Security** to see monitor status, recent
+   threats, and the quarantine. Toggle **Auto-defense** off if you prefer
+   manual control.
+
+5. **Memory.** Open **Memory** to browse past conversations and see
+   statistics. Click **Clear everything** to wipe the local store.
+
+## Configuration
+
+Aegis AI stores its config at:
+
+- **Linux**: `~/.local/share/aegis-ai/config.toml`
+- **Windows**: `%APPDATA%\aegis-ai\config.toml`
+
+The config file contains:
+
+```toml
+schema_version = 1
+language = "en"            # or "vi"
+mode = "ondemand"          # or "continuous"
+allow_autonomous = false
+
+[security]
+auto_defense = true
+monitor = true
+scanner_enabled = true
+quarantine_auto_delete_days = 30
+
+[memory]
+max_conversations = 1000
+max_activity_events = 50000
+enable_summarization = true
+```
+
+API keys are currently stored in `config.toml` for v0.1. Phase 2 moves them
+to the OS keychain.
+
+## Documentation
+
+- [**Roadmap**](ROADMAP.md) — 4-phase development plan
+- [**Privacy Policy**](PRIVACY.md) — what data is stored and how
+- [**Security Policy**](SECURITY.md) — vulnerability reporting
+- [**Architecture**](docs/ARCHITECTURE.md) — module layout and data flow
+- [**Providers**](docs/PROVIDERS.md) — how to add a new AI provider
+- [**Safety**](docs/SAFETY.md) — how the safety policy works
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Acknowledgements
+
+Built with:
+
+- [Tauri 2.0](https://tauri.app) — cross-platform desktop runtime
+- [Rust 1.97.1](https://www.rust-lang.org) — backend
+- [React 18](https://react.dev) + [TypeScript](https://www.typescriptlang.org) + [Tailwind CSS](https://tailwindcss.com) — frontend
+- [rusqlite](https://github.com/rusqlite/rusqlite) — embedded SQLite
+- [reqwest](https://github.com/seanmonstar/reqwest) — HTTP client
+- [Lucide](https://lucide.dev) — icon set
