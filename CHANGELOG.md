@@ -4,6 +4,233 @@ All notable changes to Aegis AI are documented in this file. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-08-17 — Phase 3 Begins: AI Model Catalog + Bypass Mode + Skills + 14 New Tools
+
+### Added — Unified AI model catalog (10,978 models across 119 providers)
+
+- **`src/ai/catalog.rs`** (auto-generated, ~4.8 MB): a compile-time catalog
+  of every known AI provider and model, merged from two upstream open-source
+  directories:
+  1. `The-Best-Codes/ai-model-directory` — 73 providers, 10,679 models.
+  2. `shaneholloman/models-dev` — 55 providers, 364 models.
+  After deduplication the merged catalog contains **119 providers** and
+  **10,978 models**, each with metadata:
+  - Context window length, max output tokens.
+  - Input / output modalities (text, image, file, video, audio, …).
+  - Pricing (input + output per 1M tokens).
+  - Feature flags: `supports_tool_call`, `supports_vision`,
+    `supports_structured_output`.
+  - Release date and knowledge cutoff (where available).
+- The catalog is exposed via:
+  - The `ai_list_models` Tauri command — returns the full catalog as JSON.
+  - The `ai_models_for_provider` Tauri command — returns models for a single
+    provider.
+  - `crate::ai::catalog::providers()` / `models()` / `find(pid, mid)` /
+    `models_for_provider(pid)` Rust API.
+- The Providers UI can now use the catalog to populate its model picker
+  instead of relying on the hard-coded `known_models` array on each
+  provider descriptor.
+
+### Added — 60 new OpenAI-compatible providers
+
+- Auto-generated thin wrappers under `src/ai/providers/` for every catalog
+  provider that exposes an `apiBaseUrl` and is not already implemented as a
+  bespoke client. New providers include:
+  - **xAI** (Grok family), **Perplexity**, **Cerebras**, **Novita**,
+    **NVIDIA**, **Together AI** (catalog entry), **Friendli**, **Baseten**,
+    **OVHcloud**, **Venice**, **Poe**, **Sakana**, **Modelscope**,
+    **AIHubMix**, **Chutes**, **DeepInfra** (catalog entry), **GitHub
+    Copilot**, **Helicone**, **Hyper**, **Inception**, **Inceptron**,
+    **Io.net**, **Jiekou**, **Kenari**, **Kilo**, **LLM Gateway**, **LLMtr**,
+    **Moark**, **Nano-GPT**, **NearAI**, **NeuralWatt**, **Ofox**,
+    **Ollama Cloud**, **OpenCode Zen**, **OrcaRouter**, **Pioneer**,
+    **Qiniu**, **Quiver**, **Requesty**, **Routing.run**, **Synthetic**,
+    **Tetrate**, **TokenRouter**, **TrustedRouter**, **Vercel AI**,
+    **Wafer AI**, **W&B**, **XPersoNa**, **ZenMux**, **302.AI**,
+    **Abacus**, **Abliteration AI**, **Alibaba Cloud (CN)**, **Ambient**,
+    **API AirForce**, **Avian**, **Berget**, **Cortecs**, **Crof**,
+    **EmpirioLabs**, **FastRouter**, **Impossibl**.
+- All 60 new providers delegate to the shared `openai_compat` HTTP client,
+  so they inherit streaming, function-calling, keychain credential storage,
+  and the fast-path `reqwest::Client` optimizations.
+- Total provider count: **30 bespoke** (from v0.3) + **60 new** (v0.4) =
+  **90 registered providers**, plus the 4 custom-provider slots (Custom
+  OpenAI / Anthropic / Ollama / Webhook) = **94 total**.
+- Each new provider's `known_models` array is populated from the catalog
+  (first 6 entries shown in the descriptor; the full list is available via
+  `catalog::models_for_provider`).
+
+### Added — Bypass Mode (user-controlled, irrevocable-list-protected)
+
+- **`AppConfig::bypass_mode`** — a new boolean config flag. Defaults to
+  `false`. When `true`, the safety policy will *skip* the
+  `RequireConfirmation` step for medium- and high-risk actions (unwhitelisted
+  commands, file writes outside the whitelist, file deletes, dangerous app
+  launches, network uploads).
+- **Irrevocable hard-deny list** (`is_irrevocably_destructive`): a narrow
+  set of commands whose effect cannot be undone. These ALWAYS require
+  explicit confirmation, regardless of bypass mode, autonomous mode, or
+  any other flag:
+  - `rm -rf /`, `rm -rf /*`, `rm -rf ~`, `rm -rf $HOME`.
+  - `rm -rf` on critical system paths (`/etc/`, `/usr/`, `/var/`, `/boot/`,
+    `/root/`, `/home/`, `/Users/`, `C:\`).
+  - `mkfs.*`, `mke2fs` on any block device.
+  - `dd if=... of=/dev/sdX` / `/dev/nvme` / `/dev/hd` / `/dev/disk` /
+    `\\.\PhysicalDriveX`.
+  - `shred /dev/...`, `wipe -rf /dev/...`.
+  - Windows `format C:` / `format D:`.
+  - Privilege escalation: `sudo -i`, `sudo su`, `sudo bash`, `sudo zsh`,
+    `sudo -s`, `su -`, `su root`.
+  - Kernel module loading: `insmod`, `modprobe`, `rmmod`.
+  - Credential dumpers: `mimikatz`, `procdump`, `lsass`, `gcore`.
+  - Reverse shells: `/dev/tcp/`, `bash -i >&`, `sh -i >&`, `nc -e`,
+    `ncat -e`, `socat tcp`.
+  - Reading raw SSH keys / cloud creds: `cat ~/.ssh/id_rsa`,
+    `cat ~/.aws/credentials`, `cat ~/.kube/config`.
+  - Disk wiping: `dd if=/dev/zero of=/dev/...`, `dd if=/dev/urandom of=/dev/...`.
+  - Firewall disabling: `ufw disable`, `iptables -F`, `iptables -X`,
+    `netsh advfirewall set allprofiles state off`.
+- **Expanded write whitelist** in bypass mode: when bypass is on, the
+  write-path whitelist is automatically extended with common project source
+  directories so the AI can write code into the user's projects without
+  prompting on every file:
+  `~/Documents`, `~/Projects`, `~/src`, `~/code`, `~/repos`, `~/workspace`,
+  `~/dev`, `~/Developer`, `~/.config`, `~/AppData/Local/Programs`.
+- Writes to system paths (`/etc/`, `/usr/`, `C:\Windows\`, etc.) are still
+  hard-denied — bypass mode does NOT override this.
+- **New commands**: `bypass_mode_status`, `bypass_mode_enable`,
+  `bypass_mode_disable`. The flag is also exposed in the `SettingsDto`
+  (`bypass_mode` field) and can be toggled from the Settings UI.
+- The audit log still records every AI action, even in bypass mode — so the
+  user has a tamper-evident record of what the AI did.
+- **The AI itself CANNOT enable bypass mode** — only the user can. This is
+  a one-way privilege: the user opts in, the AI benefits.
+- 12 new unit tests cover the bypass-mode behavior, including:
+  - `bypass_mode_allows_unwhitelisted_commands`
+  - `bypass_mode_allows_destructive_but_revocable_commands`
+  - `bypass_mode_does_not_allow_irrevocable_rm_rf_root`
+  - `bypass_mode_does_not_allow_irrevocable_mkfs`
+  - `bypass_mode_does_not_allow_sudo_to_root`
+  - `bypass_mode_does_not_allow_reverse_shell`
+  - `bypass_mode_does_not_allow_mimikatz`
+  - `bypass_mode_does_not_allow_writes_to_system_paths`
+  - `bypass_mode_expands_write_whitelist`
+  - `bypass_mode_allows_exfiltration`
+  - `bypass_mode_allows_file_delete`
+  - `bypass_mode_allows_dangerous_app_launch`
+
+### Added — Skills system (15 builtin skills)
+
+- **`src/ai/skills.rs`**: a new module that defines a declarative skill
+  pack system. Each skill declares:
+  - A stable unique id (`code_writer`, `code_reviewer`, …).
+  - A human-readable name and description.
+  - A `system_prompt_fragment` that is appended to the agent's system
+    prompt when the skill is active.
+  - A `tool_allowlist` (informational — not enforced) listing the tools
+    the skill expects to use.
+  - A list of `trigger_examples` — sample user messages that would
+    naturally invoke this skill.
+- The active skill is persisted in a sidecar file (`active_skill` in the
+  Aegis data dir) and read by the agent loop, which injects the fragment
+  into the system message.
+- **15 builtin skills**:
+  | Skill id           | Domain                                  |
+  |--------------------|-----------------------------------------|
+  | `code_writer`      | Writing new code from a spec.           |
+  | `code_reviewer`    | Reviewing existing code.                |
+  | `refactor`         | Refactoring / reorganizing code.        |
+  | `test_writer`      | Generating unit / integration tests.    |
+  | `doc_writer`       | Writing docs (README, ADRs, API docs).  |
+  | `git_helper`       | Git operations and PR workflow.         |
+  | `sysadmin`         | Shell + system administration.          |
+  | `researcher`       | Web research + summarization.           |
+  | `data_analyst`     | CSV / JSON data analysis.               |
+  | `translator`       | Translation between languages.          |
+  | `summarizer`       | Document summarization.                 |
+  | `email_drafter`    | Drafting emails and messages.           |
+  | `debugger`         | Debugging + log analysis.               |
+  | `architect`        | System design + architecture reviews.   |
+  | `security_auditor` | Code security review.                   |
+- **New commands**: `skills_list`, `skills_active`, `skills_set`.
+- Two new AI tools: `skill_set` (switch active skill from inside a chat)
+  and `skill_list` (list available skills).
+
+### Added — 14 new AI tools (28 total, up from 13)
+
+- The agent loop can now invoke 14 additional tools beyond the v0.3 set:
+  | Tool             | Purpose                                            |
+  |------------------|----------------------------------------------------|
+  | `file_delete`    | Delete a file (gated by safety policy).            |
+  | `file_move`      | Move / rename a file (gated by safety policy).     |
+  | `file_glob`      | Find files matching a glob pattern.                |
+  | `regex_search`   | Search file contents with a regex.                 |
+  | `diff_apply`     | Apply a unified diff to files (uses `git apply`).  |
+  | `http_fetch`     | Fetch a URL and return its body (up to 256 KB).    |
+  | `git_op`         | Run a git subcommand in a working directory.       |
+  | `process_list`   | List running processes (delegates to the monitor). |
+  | `process_kill`   | Terminate a process by pid.                        |
+  | `code_eval`      | Evaluate a python3 / node / bash snippet.          |
+  | `notify`         | Show a desktop notification.                       |
+  | `open_url`       | Open a URL in the default browser.                 |
+  | `memory_search`  | Semantic search over the knowledge base.           |
+  | `skill_set`      | Switch the active skill from inside a chat.        |
+- The `regex` crate (1.11) was added as a workspace dependency.
+- The `memory::KnowledgeBase` gained a `search(query, limit)` method that
+  ranks entries by Jaccard token-overlap + substring bonus + confidence.
+  This is the foundation for v0.5's RAG system (Phase 3.3).
+
+### Added — Phase 3.1 event-driven continuous mode (foundation)
+
+- The file-system watcher (`src/modes/watcher.rs`) is wired and emits
+  `watcher://change` events to the frontend. The continuous-mode loop
+  (`src/modes/continuous.rs`) consumes these events alongside the heartbeat
+  tick, so the AI can react to new files in watched directories.
+
+### Added — Active-skill injection in the agent loop
+
+- The agent loop now reads the `active_skill` sidecar file at the start of
+  each run and appends the skill's `system_prompt_fragment` to the system
+  message. This means the AI's persona changes immediately when the user
+  switches skills — no restart required.
+
+### Changed
+
+- Bumped version to `0.4.0` in `Cargo.toml`, `src-tauri/Cargo.toml`,
+  `package.json`, and `tauri.conf.json`.
+- `AppConfig` schema version is still `1` — the new `bypass_mode` field
+  has `#[serde(default)]` semantics via `Default::default()` so old
+  config files load cleanly.
+- The `SettingsDto` now includes a `bypass_mode: bool` field.
+- `SafetyPolicy::from_config` now reads `cfg.bypass_mode` and expands the
+  write-path whitelist when it's enabled.
+- `SafetyPolicy::bypass_mode()` getter added.
+- `ProviderRegistry::with_builtin` now registers the 60 new providers
+  alongside the existing 30.
+- `ai/mod.rs` declares the new `catalog` and `skills` submodules.
+- `lib.rs` registers the 9 new Tauri commands.
+- The `dispatch()` function in `ai/tools.rs` routes 14 additional tool
+  names to their handlers.
+
+### Fixed (pre-existing v0.3 issues)
+
+- `bypass_mode_status` command had a borrow-checker issue where the
+  `parking_lot::MutexGuard` was dropped while the `RwLockReadGuard` was
+  still alive. Fixed by copying the bool out before dropping the outer
+  guard.
+
+### Exit criteria for Phase 3.0 (v0.4)
+
+- [x] 60+ new providers registered and listed in the UI (10x provider count).
+- [x] 10k+ models catalogued and queryable from the frontend.
+- [x] Bypass mode works end-to-end: enable via UI → AI skips confirmations
+      except for the irrevocable list → audit log records every action.
+- [x] 15 skills available, switchable from the UI or from inside a chat.
+- [x] 14 new tools available to the AI agent.
+- [x] All 42 unit tests pass (`cargo test --lib`).
+
+---
+
 ## [0.3.0] — 2026-08-17 — Phase 2 Final: Computer-Use Co-Owner + Safety Layers
 
 ### Added — Built-in preconfigured AI provider (Z.AI GLM-4.6)

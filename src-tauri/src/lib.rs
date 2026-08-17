@@ -140,6 +140,17 @@ pub fn run() {
             commands::audit_recent,
             commands::audit_count,
             commands::audit_wipe,
+            // ===== v0.4 — Bypass Mode =====
+            commands::bypass_mode_status,
+            commands::bypass_mode_enable,
+            commands::bypass_mode_disable,
+            // ===== v0.4 — AI model catalog =====
+            commands::ai_list_models,
+            commands::ai_models_for_provider,
+            // ===== v0.4 — Skills =====
+            commands::skills_list,
+            commands::skills_active,
+            commands::skills_set,
             // ===== Computer use =====
             commands::computer_exec_command,
             commands::computer_open_app,

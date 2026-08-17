@@ -38,6 +38,25 @@ pub struct AppConfig {
     /// Whether AI is allowed to take actions without asking first.
     /// Defaults to `false` — every dangerous action requires confirmation.
     pub allow_autonomous: bool,
+
+    /// Whether AI is allowed to take destructive actions without asking first.
+    /// Defaults to `false` — every destructive action requires confirmation.
+    ///
+    /// When `true`, the safety policy will *skip* the `RequireConfirmation`
+    /// step for medium- and high-risk actions, EXCEPT for an irrevocable
+    /// "hard-deny" list (rm -rf /, mkfs, dd to device, sudo to root, credential
+    /// dumpers, reverse shells, kernel-module loaders, etc.) which still
+    /// surfaces a confirmation prompt regardless of bypass mode.
+    ///
+    /// **User-controlled bypass**: the user must explicitly enable this in
+    /// the Settings UI or via the `bypass_mode_enable` Tauri command. The AI
+    /// itself cannot enable bypass mode — only the user can.
+    ///
+    /// Bypass mode also expands the write-path whitelist to include common
+    /// app source directories (~/Documents, ~/Projects, ~/src, ~/code,
+    /// ~/repos, ~/.config) so the AI can write code into the user's project
+    /// folders without confirmation prompts on every file.
+    pub bypass_mode: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -207,6 +226,7 @@ impl Default for AppConfig {
             security: SecurityConfig::default(),
             memory: MemoryConfig::default(),
             allow_autonomous: false,
+            bypass_mode: false,
         }
     }
 }

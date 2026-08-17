@@ -110,4 +110,66 @@ impl KnowledgeBase {
         conn.execute("DELETE FROM knowledge", [])?;
         Ok(())
     }
+
+    /// v0.4: semantic-ish search over the knowledge base.
+    ///
+    /// Returns the top `limit` entries ranked by a simple token-overlap score
+    /// (Jaccard similarity on whitespace-tokenized lowercase tokens). This is
+    /// a placeholder for a future vector-embedding-based search; it's good
+    /// enough for short factual queries and avoids pulling in a heavy ML
+    /// dependency.
+    pub fn search(&self, query: &str, limit: usize) -> Result<Vec<KnowledgeEntry>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT key, value, source, confidence, created_at_ms, last_used_ms, use_count FROM knowledge",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                KnowledgeEntry {
+                    key: row.get(0)?,
+                    value: row.get(1)?,
+                    source: row.get(2)?,
+                    confidence: row.get(3)?,
+                    created_at_ms: row.get::<_, i64>(4)? as u64,
+                    last_used_ms: row.get::<_, i64>(5)? as u64,
+                    use_count: row.get::<_, i64>(6)? as u64,
+                },
+            ))
+        })?;
+
+        let q_tokens: std::collections::HashSet<String> = query
+            .to_lowercase()
+            .split_whitespace()
+            .map(|s| s.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .filter(|s| !s.is_empty() && s.len() > 1)
+            .collect();
+
+        let mut scored: Vec<(f64, KnowledgeEntry)> = Vec::new();
+        for r in rows {
+            let entry = r?.0;
+            // Combine key + value into a single bag of tokens.
+            let combined = format!("{} {}", entry.key, entry.value).to_lowercase();
+            let entry_tokens: std::collections::HashSet<String> = combined
+                .split_whitespace()
+                .map(|s| s.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+                .filter(|s| !s.is_empty() && s.len() > 1)
+                .collect();
+            // Jaccard similarity.
+            let inter = q_tokens.intersection(&entry_tokens).count() as f64;
+            let union = q_tokens.union(&entry_tokens).count() as f64;
+            let score = if union > 0.0 { inter / union } else { 0.0 };
+            // Bonus: substring match on the value.
+            let bonus = if entry.value.to_lowercase().contains(&query.to_lowercase()) {
+                0.25
+            } else {
+                0.0
+            };
+            let final_score = score + bonus + entry.confidence * 0.05;
+            if final_score > 0.0 {
+                scored.push((final_score, entry));
+            }
+        }
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        Ok(scored.into_iter().take(limit).map(|(_, e)| e).collect())
+    }
 }

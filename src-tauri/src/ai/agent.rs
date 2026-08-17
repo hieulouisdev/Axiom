@@ -216,22 +216,29 @@ async fn agent_loop_inner(
         .collect();
 
     // Inject the system prompt that explains the agent's role.
-    messages.insert(
-        0,
-        ChatMessage::system(
-            "You are Aegis AI, a secure cross-platform assistant with full \
-             computer-use capabilities. You can run shell commands, read and \
-             write files, launch applications, capture the screen, automate \
-             the GUI, and remember facts for later.\n\n\
-             When the user asks you to do something on their machine, prefer \
-             calling the appropriate tool (`shell`, `file_read`, `file_write`, \
-             `app_open`, etc.) over instructing them to do it manually. If a \
-             tool returns `safety_decision: require_confirmation`, tell the \
-             user to approve the action in the Aegis UI and stop.\n\n\
-             Be concise, accurate, and refuse any request that would harm the \
-             user's system. Never attempt to bypass the safety policy."
-        ),
+    let skill_fragment = {
+        let path = crate::config::AppConfig::data_dir().join("active_skill");
+        std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|s| crate::ai::skills::find(s.trim()).map(|sk| sk.system_prompt_fragment))
+            .unwrap_or("")
+    };
+    let system_prompt = format!(
+        "You are Aegis AI, a secure cross-platform assistant with full \
+         computer-use capabilities. You can run shell commands, read and \
+         write files, launch applications, capture the screen, automate \
+         the GUI, and remember facts for later.\n\n\
+         When the user asks you to do something on their machine, prefer \
+         calling the appropriate tool (`shell`, `file_read`, `file_write`, \
+         `app_open`, etc.) over instructing them to do it manually. If a \
+         tool returns `safety_decision: require_confirmation`, tell the \
+         user to approve the action in the Aegis UI and stop.\n\n\
+         Be concise, accurate, and refuse any request that would harm the \
+         user's system. Never attempt to bypass the safety policy.\n\n\
+         --- Active skill specialization ---\n\
+         {skill_fragment}"
     );
+    messages.insert(0, ChatMessage::system(system_prompt));
 
     let tool_specs: Vec<ToolSpec> = tools::all_specs();
     let tools_json = tools::specs_as_json();

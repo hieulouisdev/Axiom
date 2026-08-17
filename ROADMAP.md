@@ -2,7 +2,7 @@
 
 This file tracks the four-stage development plan for Aegis AI. Each phase has
 a clear goal, scope, deliverables, and exit criteria. The current release is
-**v0.1 (Phase 1 — Foundation Skeleton)**.
+**v0.4.0 (Phase 3.0 — AI Model Catalog + Bypass Mode + Skills + New Tools)**.
 
 ---
 
@@ -195,14 +195,49 @@ see `CHANGELOG.md` § "Fixed (pre-existing v0.2 issues)" for the full list.
 **Goal:** Differentiate from generic AI chat apps with proactive agent
 behavior, voice, and deep OS integration.
 
+**Status:** v0.4 released 2026-08-17 (Phase 3.0 — catalog, bypass, skills,
+new tools). Phase 3.1 / 3.2 / 3.3 still in progress.
+
+### 3.0 — v0.4 baseline (catalog + bypass + skills + tools)
+
+- [x] Unified AI model catalog (10,978 models across 119 providers) merged
+      from `The-Best-Codes/ai-model-directory` and `shaneholloman/models-dev`.
+- [x] 60 new OpenAI-compatible providers registered (xAI, Perplexity,
+      Cerebras, Novita, NVIDIA, Together, Friendli, Baseten, OVHcloud,
+      Venice, Poe, Sakana, Modelscope, AIHubMix, Chutes, GitHub Copilot,
+      Helicone, Hyper, Inception, Inceptron, Io.net, Jiekou, Kenari, Kilo,
+      LLM Gateway, LLMtr, Moark, Nano-GPT, NearAI, NeuralWatt, Ofox,
+      Ollama Cloud, OpenCode Zen, OrcaRouter, Pioneer, Qiniu, Quiver,
+      Requesty, Routing.run, Synthetic, Tetrate, TokenRouter,
+      TrustedRouter, Vercel AI, Wafer AI, W&B, XPersoNa, ZenMux, 302.AI,
+      Abacus, Abliteration AI, Alibaba Cloud (CN), Ambient, API AirForce,
+      Avian, Berget, Cortecs, Crof, EmpirioLabs, FastRouter, Impossibl).
+- [x] Bypass Mode — user-controlled opt-in for "AI does what it wants".
+      The safety policy skips confirmation for medium- and high-risk
+      actions, except for an irrevocable hard-deny list (rm -rf /, mkfs,
+      dd to device, sudo to root, credential dumpers, reverse shells,
+      kernel modules). Expanded write whitelist includes common project
+      source directories.
+- [x] Skills system: 15 builtin skills (code_writer, code_reviewer,
+      refactor, test_writer, doc_writer, git_helper, sysadmin, researcher,
+      data_analyst, translator, summarizer, email_drafter, debugger,
+      architect, security_auditor). Active skill injects its prompt
+      fragment into the agent's system message.
+- [x] 14 new AI tools (file_delete, file_move, file_glob, regex_search,
+      diff_apply, http_fetch, git_op, process_list, process_kill,
+      code_eval, notify, open_url, memory_search, skill_set) — 28 total.
+- [x] Phase 3.1 file-system watcher is wired and emitting events to the
+      frontend. Continuous mode consumes the events alongside its
+      heartbeat.
+
 ### 3.1 Event-driven continuous mode
 
-- [ ] File-system watcher (`notify` crate) — AI reacts to new files in
+- [x] File-system watcher (`notify` crate) — AI reacts to new files in
       watched directories.
 - [ ] Calendar integration (CalDAV) — proactive daily summaries.
 - [ ] Calendar-intent dispatch ("schedule a meeting with…") via the AI.
-- [ ] Wake-on-event bus: security escalations, calendar ticks, file events,
-      hotkey presses.
+- [x] Wake-on-event bus: security escalations, file events, hotkey
+      presses (heartbeat-based for v0.4; richer event bus coming in v0.5).
 
 ### 3.2 Voice I/O
 
@@ -212,18 +247,26 @@ behavior, voice, and deep OS integration.
 
 ### 3.3 Knowledge graph
 
+- [x] Foundation: `KnowledgeBase::search(query, limit)` — Jaccard
+      token-overlap ranking + substring bonus. Sufficient for short
+      factual queries.
 - [ ] Replace the simple `key → value` knowledge table with a vector
       embedding store (`qdrant` or `lancedb`).
 - [ ] Auto-extract entities from chat history (regex + LLM).
 - [ ] Retrieval-augmented generation (RAG): inject relevant facts into the
-      next chat's system prompt.
+      next chat's system prompt. (Partial: `memory_search` tool exposes
+      the search; agent loop integration is v0.5.)
 
 ### 3.4 Tool/function calling
 
-- [ ] OpenAI function-calling schema for structured tool invocation.
-- [ ] Anthropic tool-use API.
-- [ ] Local tool registry: file ops, web search, shell exec, screenshot.
-- [ ] Tool-result truncation policy to stay under context window.
+- [x] OpenAI function-calling schema for structured tool invocation.
+- [x] Anthropic tool-use API.
+- [x] Local tool registry: file ops, web search, shell exec, screenshot,
+      git, process, code eval, regex search, diff apply, notify, open_url,
+      memory search, skill switching.
+- [x] Tool-result truncation policy to stay under context window (64 KB
+      cap on `code_eval` output, 256 KB cap on `http_fetch` body, 100-hit
+      cap on `regex_search`).
 
 ### 3.5 Mobile companion (stretch)
 

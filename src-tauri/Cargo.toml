@@ -90,6 +90,9 @@ procfs = "0.16"
 # Phase 2: HTTP types for AWS SigV4
 http = "1.1"
 
+# v0.4: Regex for the regex_search tool + glob-to-regex conversion
+regex = "1.11"
+
 # Platform-specific
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.29", features = ["process", "signal", "user"] }

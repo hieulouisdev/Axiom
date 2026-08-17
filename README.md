@@ -5,32 +5,53 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.97.1-orange.svg)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-orange.svg)](https://tauri.app)
-[![Phase](https://img.shields.io/badge/Phase-2%20Final%20(v0.3)-green.svg)](ROADMAP.md)
+[![Phase](https://img.shields.io/badge/Phase-3.0%20(v0.4)-green.svg)](ROADMAP.md)
 
-> **Current release:** v0.3 — Phase 2 final. Adds the built-in zero-config
-> Aegis Cloud provider (Z.AI GLM-4.6), a computer-use agent loop with 13
-> tools, fast-path HTTP optimizations, and three new safety layers (kill
-> switch, rate limiter, audit log). See the [Roadmap](ROADMAP.md) and
+> **Current release:** v0.4 — Phase 3 begins. Adds a unified AI model
+> catalog (10,978 models across 119 providers), 60 new OpenAI-compatible
+> providers, a user-controlled **Bypass Mode** (the AI does what it wants,
+> except for an irrevocable hard-deny list), 15 builtin **skills** (code
+> writer, code reviewer, debugger, architect, security auditor, …), and
+> **14 new tools** (git_op, regex_search, diff_apply, code_eval,
+> process_list, http_fetch, …). See the [Roadmap](ROADMAP.md) and
 > [Changelog](CHANGELOG.md) for details.
 
 ## What is Aegis AI?
 
 Aegis AI is a desktop application (Linux + Windows) that lets you connect to
-**34 AI providers** from many sources — built-in zero-config (Aegis Cloud /
-Z.AI GLM-4.6), cloud (OpenAI, Anthropic, Gemini, DeepSeek, Groq, Mistral,
-Cohere, Together, Anyscale, Azure OpenAI, AWS Bedrock, HuggingFace,
-Replicate, Moonshot, Zhipu, Yi, DeepInfra, Fireworks), local (Ollama, LM
-Studio, LocalAI, llama.cpp, GPT4All, Jan, KoboldCpp, vLLM, Llamafile), and
-custom (any OpenAI-compat / Anthropic-compat / Ollama-compat endpoint, or a
-generic webhook).
+**90+ AI providers** backed by a unified catalog of **10,978 models** —
+built-in zero-config (Aegis Cloud / Z.AI GLM-4.6), cloud (OpenAI,
+Anthropic, Gemini, DeepSeek, Groq, Mistral, Cohere, Together, Anyscale,
+Azure OpenAI, AWS Bedrock, HuggingFace, Replicate, Moonshot, Zhipu, Yi,
+DeepInfra, Fireworks, **xAI**, **Perplexity**, **Cerebras**, **Novita**,
+**NVIDIA**, **Friendli**, **Baseten**, **OVHcloud**, **Venice**, **Poe**,
+**Sakana**, **Modelscope**, **AIHubMix**, **GitHub Copilot**, **Vercel AI**, …),
+local (Ollama, LM Studio, LocalAI, llama.cpp, GPT4All, Jan, KoboldCpp,
+vLLM, Llamafile, Ollama Cloud), and custom (any OpenAI-compat /
+Anthropic-compat / Ollama-compat endpoint, or a generic webhook).
 
 Beyond chat, Aegis AI can **act on your computer** — open apps, read/write
 files, run shell commands, automate the GUI (mouse/keyboard), and capture
 the screen — but only with explicit consent for anything risky. As of v0.3,
 the AI can also act as a **computer-use co-owner**: an agent loop lets it
-autonomously chain together 13 local tools (shell, file ops, app launch,
-screenshot, GUI automation, clipboard, memory) via OpenAI-style
-function-calling, while every action flows through the safety policy.
+autonomously chain together **28 local tools** (shell, file ops including
+move/delete/glob/regex-search/diff-apply, app launch, screenshot, GUI
+automation, clipboard, memory, git, process, code_eval, http_fetch,
+notify, open_url, skill switching) via OpenAI-style function-calling,
+while every action flows through the safety policy.
+
+New in v0.4: the user can enable **Bypass Mode** — when on, the AI skips
+safety confirmations for medium- and high-risk actions (so it can write
+code into your project folders, run shell pipelines, delete files, etc.
+without prompting on every step), EXCEPT for an irrevocable hard-deny list
+(rm -rf /, mkfs, dd to device, sudo to root, credential dumpers, reverse
+shells, kernel modules). The audit log still records every action.
+
+Also new: **Skills** — pick from 15 builtin specializations (code writer,
+code reviewer, refactorer, test writer, doc writer, git helper, sysadmin,
+researcher, data analyst, translator, summarizer, email drafter, debugger,
+architect, security auditor) and the AI's persona + preferred tools change
+immediately, no restart required.
 
 It also runs a **passive security monitor** that watches for malicious
 processes, and when a threat is detected it can **auto-wake** (even in
@@ -46,11 +67,25 @@ The UI is clean, white-themed, and supports **English (default)** and
 
 ## Highlights
 
-- **34 AI providers** with a uniform `Provider` trait; switching is one click.
+- **90+ AI providers** with a uniform `Provider` trait; switching is one click.
+- **Unified AI model catalog**: 10,978 models across 119 providers, with
+  context window, modalities, pricing, and feature flags. Queryable from
+  the frontend via `ai_list_models`.
+- **15 builtin skills**: pick a specialization (code writer, debugger,
+  security auditor, …) and the AI's system prompt adapts immediately.
+- **Bypass Mode** (user-controlled): the AI skips safety confirmations
+  except for an irrevocable hard-deny list (rm -rf /, mkfs, sudo to root,
+  reverse shells, kernel modules, credential dumpers). Expanded write
+  whitelist includes `~/Projects`, `~/src`, `~/code`, `~/repos`, etc.
+- **28 AI tools** (v0.4: +14): shell, file ops (read/write/list/move/
+  delete/glob/regex-search/diff-apply), app launch, screenshot, GUI
+  automation, clipboard, http_fetch, git_op, process_list, process_kill,
+  code_eval (python3/node/bash), notify, open_url, memory (remember/lookup/
+  search), skill_set/list.
 - **Zero-config built-in AI**: set `AEGIS_DEFAULT_API_KEY` (or `ZAI_API_KEY`)
   env var and Aegis Cloud / GLM-4.6 is ready the moment you launch the app.
-- **Computer-use agent loop**: AI autonomously chains shell + file + app +
-  GUI + screenshot + clipboard + memory tools via OpenAI function-calling.
+- **Computer-use agent loop**: AI autonomously chains tools via OpenAI
+  function-calling, with iteration cap, kill switch, rate limiter, audit log.
 - **Fast-path HTTP**: tuned reqwest pool + LRU response cache + dedup layer
   cut first-token latency from ~1.5s to <400ms on warm calls.
 - **Three safety layers**: kill switch (process-wide halt), rate limiter
@@ -58,14 +93,17 @@ The UI is clean, white-themed, and supports **English (default)** and
 - **Two cost modes**: Continuous (always on) or On-demand (wake-on-call) —
   the security monitor runs in both.
 - **Safety-first computer use**: every potentially destructive action flows
-  through a 5-level risk classifier and requires confirmation.
+  through a 5-level risk classifier and requires confirmation (unless bypass
+  mode is on).
 - **Extended destructive-command denylist**: covers reverse shells,
   cryptominers, credential dumpers, process injection, exfiltration, and
-  more — even autonomous mode surfaces these for confirmation.
+  more — plus the v0.4 irrevocable hard-deny list that always requires
+  confirmation regardless of bypass mode.
 - **Auto-defense**: passive process monitor → threat signature matching →
   quarantine + kill, with full audit trail.
 - **Persistent memory**: SQLite-backed conversations, activities, knowledge,
-  audit log.
+  audit log. Knowledge base now supports semantic search (Jaccard +
+  substring bonus).
 - **Privacy**: data stays on your device. No telemetry. No cloud sync.
 - **Bilingual UI**: English and Vietnamese.
 

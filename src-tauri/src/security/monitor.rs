@@ -110,6 +110,14 @@ pub fn latest_snapshot() -> Vec<ProcessSnapshot> {
     LATEST.lock().clone()
 }
 
+/// v0.4: alias for `latest_snapshot()` used by the AI's `process_list` tool.
+pub fn snapshot_processes() -> Vec<ProcessSnapshot> {
+    latest_snapshot()
+}
+
+/// v0.4: type alias for tools that need the process info type.
+pub type ProcInfo = ProcessSnapshot;
+
 /// Returns a copy of recently detected threats.
 pub fn recent_threats() -> Vec<Threat> {
     RECENT_THREATS.lock().clone()

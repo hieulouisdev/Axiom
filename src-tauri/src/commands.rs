@@ -953,6 +953,7 @@ pub fn settings_get(state: State<'_, Arc<Mutex<AppState>>>) -> SettingsDto {
         language: cfg.language.clone(),
         mode: format!("{:?}", cfg.mode).to_lowercase(),
         allow_autonomous: cfg.allow_autonomous,
+        bypass_mode: cfg.bypass_mode,
         auto_defense: cfg.security.auto_defense,
         monitor: cfg.security.monitor,
         scanner_enabled: cfg.security.scanner_enabled,
@@ -965,6 +966,7 @@ pub struct SettingsDto {
     pub language: String,
     pub mode: String,
     pub allow_autonomous: bool,
+    pub bypass_mode: bool,
     pub auto_defense: bool,
     pub monitor: bool,
     pub scanner_enabled: bool,
@@ -985,6 +987,7 @@ pub fn settings_set(
             _ => OperatingMode::OnDemand,
         };
         cfg.allow_autonomous = dto.allow_autonomous;
+        cfg.bypass_mode = dto.bypass_mode;
         cfg.security.auto_defense = dto.auto_defense;
         cfg.security.monitor = dto.monitor;
         cfg.security.scanner_enabled = dto.scanner_enabled;
@@ -1204,6 +1207,115 @@ pub async fn aegis_cloud_test(
 #[tauri::command]
 pub fn agent_list_tools() -> serde_json::Value {
     crate::ai::tools::specs_as_json()
+}
+
+// ===========================================================================
+// v0.4 — Bypass Mode
+// ===========================================================================
+
+/// Returns whether bypass mode is currently enabled.
+#[tauri::command]
+pub fn bypass_mode_status(state: State<'_, Arc<Mutex<AppState>>>) -> bool {
+    let s = state.lock();
+    let bypass = s.config.read().bypass_mode;
+    drop(s);
+    bypass
+}
+
+/// Enable bypass mode — the AI will skip the safety confirmation prompt for
+/// all medium- and high-risk actions, except for the irrevocable hard-deny
+/// list (rm -rf /, mkfs, dd to device, sudo to root, credential dumpers,
+/// reverse shells, kernel modules, etc.).
+///
+/// The audit log still records every action.
+#[tauri::command]
+pub fn bypass_mode_enable(state: State<'_, Arc<Mutex<AppState>>>) -> Result<()> {
+    {
+        let s = state.lock();
+        let mut cfg = s.config.write();
+        cfg.bypass_mode = true;
+        cfg.save()?;
+    }
+    // Refresh the router so the change takes effect immediately.
+    let router = {
+        let s = state.lock();
+        s.router.clone()
+    };
+    router.refresh();
+    tracing::warn!("bypass mode ENABLED by user — AI will skip safety confirmations except for the irrevocable hard-deny list");
+    Ok(())
+}
+
+/// Disable bypass mode — back to normal safety policy.
+#[tauri::command]
+pub fn bypass_mode_disable(state: State<'_, Arc<Mutex<AppState>>>) -> Result<()> {
+    {
+        let s = state.lock();
+        let mut cfg = s.config.write();
+        cfg.bypass_mode = false;
+        cfg.save()?;
+    }
+    let router = {
+        let s = state.lock();
+        s.router.clone()
+    };
+    router.refresh();
+    tracing::info!("bypass mode DISABLED — normal safety policy restored");
+    Ok(())
+}
+
+// ===========================================================================
+// v0.4 — AI model catalog
+// ===========================================================================
+
+/// Returns the full AI model catalog (all providers + all models).
+/// Use this to populate the Providers UI's model picker.
+#[tauri::command]
+pub fn ai_list_models() -> serde_json::Value {
+    serde_json::json!({
+        "providers": crate::ai::catalog::providers(),
+        "models": crate::ai::catalog::models(),
+        "provider_count": crate::ai::catalog::provider_count(),
+        "model_count": crate::ai::catalog::model_count(),
+    })
+}
+
+/// Returns the catalog entries for a single provider.
+#[tauri::command]
+pub fn ai_models_for_provider(provider_id: String) -> Vec<&'static crate::ai::catalog::CatalogModel> {
+    crate::ai::catalog::models_for_provider(&provider_id)
+}
+
+// ===========================================================================
+// v0.4 — Skills
+// ===========================================================================
+
+/// Returns the list of all available skills.
+#[tauri::command]
+pub fn skills_list() -> &'static [crate::ai::skills::Skill] {
+    crate::ai::skills::all_skills()
+}
+
+/// Returns the currently active skill id (read from the sidecar file).
+#[tauri::command]
+pub fn skills_active() -> Option<String> {
+    let path = crate::config::AppConfig::data_dir().join("active_skill");
+    std::fs::read_to_string(&path).ok().map(|s| s.trim().to_string())
+}
+
+/// Set the active skill by id. The agent loop will inject its prompt fragment.
+#[tauri::command]
+pub fn skills_set(id: String) -> Result<()> {
+    if crate::ai::skills::find(&id).is_none() {
+        return Err(AegisError::Config(format!("unknown skill: {id}")));
+    }
+    let path = crate::config::AppConfig::data_dir().join("active_skill");
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    std::fs::write(&path, &id)
+        .map_err(|e| AegisError::Io(format!("failed to write active_skill: {e}")))?;
+    Ok(())
 }
 
 // Silence unused warnings for re-exported types used only in command signatures.
