@@ -80,7 +80,12 @@ jobs:
             libssl-dev \
             patchelf \
             libxdo-dev \
-            tesseract-ocr
+            tesseract-ocr \
+            libayatana-appindicator3-dev
+          # `libayatana-appindicator3-dev` provides the system-tray library
+          # that Tauri 2.0's tray-icon feature requires on Linux. Without it,
+          # the Tauri CLI panics with "Can't detect any appindicator library"
+          # at the bundling step.
 
       - name: Setup Node 20
         uses: actions/setup-node@v4

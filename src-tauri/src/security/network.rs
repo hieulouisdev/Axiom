@@ -95,7 +95,7 @@ pub fn detect_anomalies() -> Vec<NetworkAnomaly> {
 fn enumerate_sockets() -> Result<Vec<SocketInfo>> {
     let mut sockets = Vec::new();
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     {
         enumerate_sockets_procfs(&mut sockets)?;
     }
@@ -105,15 +105,16 @@ fn enumerate_sockets() -> Result<Vec<SocketInfo>> {
         enumerate_sockets_windows(&mut sockets)?;
     }
 
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(any(target_os = "linux", windows)))]
     {
-        // No implementation for this platform
+        // No implementation for this platform (macOS, BSD, …).
+        // procfs is Linux-only; on other unixes we'd need a different source.
     }
 
     Ok(sockets)
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn enumerate_sockets_procfs(sockets: &mut Vec<SocketInfo>) -> Result<()> {
     // Try using the procfs crate
     if let Ok(tcp_entries) = procfs::net::tcp() {
