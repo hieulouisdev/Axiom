@@ -91,30 +91,37 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
-      - name: Cargo fmt check (lint gate)
+      - name: Cargo fmt check (lint gate, informational)
         working-directory: src-tauri
         run: cargo fmt --all -- --check
         continue-on-error: true # v0.5: informational; will be enforced in v0.6
 
-      - name: Cargo clippy (lint gate)
+      - name: Cargo clippy (lint gate, informational)
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
         continue-on-error: true # v0.5: informational; will be enforced in v0.6
 
       - name: Build frontend
+        id: frontend
         run: npm run build
 
       - name: Determine release tag
         id: reltag
+        if: always()
         shell: bash
         run: |
-          if [ -n "${{ github.event.release.tag_name }}" ]; then
-            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          # Prefer the release event's tag, fall back to workflow_dispatch input.
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            echo "::error::No release tag found (neither release event nor workflow_dispatch input)."
+            exit 1
           fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag: $TAG"
 
       - name: Build & upload Tauri bundle to the release
+        id: tauri
+        if: success() || steps.frontend.outcome == 'success'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -127,16 +134,11 @@ jobs:
           args: --target ${{ matrix.target }}
 
       - name: Generate SHA-256 checksums (Linux)
-        if: matrix.label == 'linux'
+        if: matrix.label == 'linux' && steps.tauri.outcome == 'success'
         shell: bash
         run: |
           set -e
           mkdir -p checksums
-          # tauri-action already uploaded artifacts to the release;
-          # download them again to compute checksums.
-          TAG="${{ steps.reltag.outputs.tag }}"
-          REPO="${{ github.repository }}"
-          # Find artifacts under src-tauri/target/<target>/release/bundle
           BUNDLE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle"
           if [ -d "$BUNDLE_DIR" ]; then
             find "$BUNDLE_DIR" -type f \( -name '*.deb' -o -name '*.AppImage' \) -print0 | \
@@ -144,11 +146,13 @@ jobs:
                 base=$(basename "$f")
                 sha256sum "$f" > "checksums/${base}.sha256"
               done
+            ls -la checksums/
+          else
+            echo "::warning::No bundle directory found at $BUNDLE_DIR"
           fi
-          ls -la checksums/ || true
 
       - name: Generate SHA-256 checksums (Windows)
-        if: matrix.label == 'windows'
+        if: matrix.label == 'windows' && steps.tauri.outcome == 'success'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path checksums | Out-Null
@@ -159,11 +163,13 @@ jobs:
                 $hash = (Get-FileHash -Algorithm SHA256 -Path $_.FullName).Hash
                 "$hash  $($_.Name)" | Out-File -FilePath "checksums/$($_.Name).sha256" -Encoding ascii
               }
+            Get-ChildItem checksums/
+          } else {
+            Write-Warning "No bundle directory found at $bundle"
           }
-          Get-ChildItem checksums/ -ErrorAction SilentlyContinue
 
       - name: Upload checksums to release
-        if: always()
+        if: always() && steps.tauri.outcome == 'success'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.reltag.outputs.tag }}
@@ -176,15 +182,19 @@ jobs:
         if: always()
         shell: bash
         run: |
-          echo "### Build summary (${{ matrix.label }})" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Target: \`${{ matrix.target }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Bundles: \`${{ matrix.bundles }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Release tag: \`${{ steps.reltag.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Rust: 1.97.1 (matches rust-toolchain.toml)" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Bundles produced under \`src-tauri/target/${{ matrix.target }}/release/bundle/\`:" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          find src-tauri/target -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*.msi' -o -name '*.exe' \) 2>/dev/null | head -20 >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Build summary (${{ matrix.label }})"
+            echo ""
+            echo "- Target: \`${{ matrix.target }}\`"
+            echo "- Bundles: \`${{ matrix.bundles }}\`"
+            echo "- Release tag: \`${{ steps.reltag.outputs.tag }}\`"
+            echo "- Frontend outcome: \`${{ steps.frontend.outcome }}\`"
+            echo "- Tauri outcome: \`${{ steps.tauri.outcome }}\`"
+            echo "- Rust: 1.97.1 (matches rust-toolchain.toml)"
+            echo ""
+            echo "Bundles produced under \`src-tauri/target/${{ matrix.target }}/release/bundle/\`:"
+            echo ""
+            echo '```'
+            find src-tauri/target -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*.msi' -o -name '*.exe' \) 2>/dev/null | head -20 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

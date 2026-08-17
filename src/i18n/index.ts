@@ -1,4 +1,7 @@
-import type { Locale } from "./types";
+// Supported UI locales. v0.5 fix: previously this imported `Locale` from a
+// missing `./types` module, which broke `tsc`. Define the type inline and
+// re-export it so callers (e.g. store/index.ts) can `import { Locale }`.
+export type Locale = "en" | "vi";
 
 const en: Record<string, string> = {
   "app.name": "Aegis AI",

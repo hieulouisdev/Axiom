@@ -1429,7 +1429,8 @@ pub async fn calendar_list_today(
 ) -> Result<Vec<crate::calendar::CalendarEvent>> {
     let client = {
         let s = state.lock();
-        s.calendar.lock().clone()
+        let cal = s.calendar.lock();
+        cal.clone()
     };
     client.today().await
 }
@@ -1463,7 +1464,8 @@ pub async fn calendar_dispatch_intent(
 ) -> Result<crate::calendar::CalendarDispatchResult> {
     let client = {
         let s = state.lock();
-        s.calendar.lock().clone()
+        let cal = s.calendar.lock();
+        cal.clone()
     };
     crate::calendar::dispatch_calendar_intent(&message, &client).await
 }

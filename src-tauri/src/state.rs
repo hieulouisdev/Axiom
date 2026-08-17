@@ -101,7 +101,7 @@ impl AppState {
     /// security monitor spawn, etc.). Called from inside Tauri's `setup`.
     pub async fn boot(state: &Arc<Mutex<Self>>, app: &AppHandle) -> anyhow::Result<()> {
         {
-            let mut s = state.lock();
+            let s = state.lock();
             *s.app_handle.lock() = Some(app.clone());
         }
 

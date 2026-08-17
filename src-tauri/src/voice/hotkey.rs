@@ -9,17 +9,18 @@
 //! Default hotkey: `Ctrl+Space`. Override via `AEGIS_PTT_HOTKEY` env var
 //! or the Settings UI (stored in `voice.toml` inside the data dir).
 //!
-//! Note: `tauri-plugin-global-shortcut` only fires `on_pressed` (no
-//! `on_released` in the public API), so v0.5 implements a simple toggle
-//! semantics: first press = start recording, second press = stop & send.
-//! Phase 4 will switch to hold-to-talk once the plugin exposes `on_released`.
+//! Note: `tauri-plugin-global-shortcut` 2.3.2's `on_shortcut` handler
+//! receives a `ShortcutEvent` (re-export of `GlobalHotKeyEvent`) whose
+//! `.state` field is `Pressed` or `Released`. We could implement hold-
+//! to-talk by listening for both states, but v0.5 keeps toggle semantics
+//! for forward-compat with the plugin's earlier 2.0 API.
 
 use std::sync::Arc;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri::{AppHandle, Emitter};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 
 use crate::error::{AegisError, Result};
 
@@ -118,10 +119,10 @@ pub fn register(app: &AppHandle, manager: &Arc<HotkeyManager>) -> Result<()> {
 
     let app_clone = app.clone();
     let manager_clone = manager.clone();
-    let handler = move |_app: &AppHandle, _shortcut: &Shortcut, event: ShortcutState| {
-        // global-shortcut only fires on pressed in tauri-plugin 2.0 stable,
-        // but we keep the match for forward-compat.
-        if event == ShortcutState::Pressed {
+    let handler = move |_app: &AppHandle, _shortcut: &Shortcut, event: ShortcutEvent| {
+        // The plugin fires on every press AND release. We only toggle on
+        // press to avoid double-toggling within a single key press cycle.
+        if event.state == ShortcutState::Pressed {
             manager_clone.toggle(&app_clone);
         }
     };
