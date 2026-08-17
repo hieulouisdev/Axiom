@@ -113,74 +113,25 @@ impl BedrockProvider {
     }
 
     /// Sign the request with AWS SigV4.
-    /// Uses the `aws_sigv4` crate for proper signing.
+    ///
+    /// v0.3 note: `aws-sigv4` 1.5.1 (resolved by Cargo.lock) has a substantially
+    /// different API from the 1.2 release this code was originally written
+    /// against. The full SigV4 signing rewrite is queued for v0.4 (see
+    /// ROADMAP §2.4). In the meantime, Bedrock chat requests return a clear
+    /// "not implemented" error rather than silently failing.
     fn sign_request(
         &self,
-        method: &str,
-        url: &str,
-        body: &[u8],
-        creds: &ProviderCreds,
+        _method: &str,
+        _url: &str,
+        _body: &[u8],
+        _creds: &ProviderCreds,
     ) -> Result<reqwest::RequestBuilder> {
-        let access_key = creds.api_key.clone()
-            .ok_or_else(|| AegisError::AiNotConfigured(
-                "bedrock requires AWS access key as api_key".into()
-            ))?;
-
-        let secret_key = creds.extra.get("secret_key")
-            .cloned()
-            .ok_or_else(|| AegisError::AiNotConfigured(
-                "bedrock requires 'secret_key' in extra config".into()
-            ))?;
-
-        let region = creds.extra.get("region")
-            .cloned()
-            .unwrap_or_else(|| "us-east-1".into());
-
-        let session_token = creds.extra.get("session_token").cloned();
-
-        // Use AWS SigV4 signing
-        let signing_config = aws_sigv4::http::SigningConfig {
-            algorithm: aws_sigv4::Algorithm::HmacSha256,
-            region: region.clone(),
-            service: "bedrock".into(),
-            time: None,
-            credentials: aws_sigv4::Credentials::new(
-                access_key,
-                secret_key,
-                session_token,
-                None,
-                "aegis-bedrock"
-            ).map_err(|e| AegisError::Ai(format!("AWS credentials: {e}")))?,
-            payload_config: None,
-            uri_path_normalization: true,
-            settings: aws_sigv4::http::SigningSettings::default(),
-        };
-
-        // Build the unsigned request
-        let unsigned = http::Request::builder()
-            .method(method)
-            .uri(url)
-            .header("content-type", "application/json")
-            .body(body.to_vec())
-            .map_err(|e| AegisError::Ai(format!("build request: {e}")))?;
-
-        // Sign the request
-        let (signing_params, _) = aws_sigv4::http::sign(unsigned, &signing_config)
-            .map_err(|e| AegisError::Ai(format!("SigV4 signing: {e}")))?;
-
-        // Convert to reqwest request
-        let mut builder = self.client.post(url)
-            .header("content-type", "application/json");
-
-        for (name, value) in signing_params.headers() {
-            if let Ok(v) = value.to_str() {
-                builder = builder.header(name.as_str(), v);
-            }
-        }
-
-        builder = builder.body(body.to_vec());
-
-        Ok(builder)
+        Err(AegisError::Ai(
+            "AWS Bedrock signing is not implemented in v0.3 — the aws-sigv4 crate \
+             version resolved by Cargo.lock (1.5.1) differs from the version this \
+             code was written against (1.2). See ROADMAP §2.4 for the v0.4 plan."
+                .into(),
+        ))
     }
 }
 

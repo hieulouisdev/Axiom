@@ -57,15 +57,18 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some("aegis-ai"),
+            Some(vec!["aegis-ai"]),
         ))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(move |app| {
             // Boot background services.
             let handle = app.handle().clone();
+            // Clone the Arc here so the block_on closure can consume its own
+            // copy while the outer setup closure retains one for `app.manage`.
+            let state_for_boot = app_state_for_setup.clone();
             tauri::async_runtime::block_on(async move {
-                if let Err(e) = AppState::boot(&app_state_for_setup, &handle).await {
+                if let Err(e) = AppState::boot(&state_for_boot, &handle).await {
                     tracing::error!("boot failed: {e:#}");
                 }
             });
@@ -121,6 +124,22 @@ pub fn run() {
             commands::ai_set_active_provider,
             commands::ai_configure_provider,
             commands::ai_test_provider,
+            // ===== v0.3 — Aegis Cloud (built-in preconfigured provider) =====
+            commands::aegis_cloud_preconfigured,
+            commands::aegis_cloud_configure,
+            commands::aegis_cloud_test,
+            // ===== v0.3 — Agent loop (computer-use co-owner) =====
+            commands::ai_agent_run,
+            commands::agent_list_tools,
+            // ===== v0.3 — Safety: kill switch / rate limiter / audit =====
+            commands::safety_trip_kill_switch,
+            commands::safety_reset_kill_switch,
+            commands::safety_kill_switch_status,
+            commands::safety_rate_limiter_status,
+            commands::safety_rate_limiter_reset,
+            commands::audit_recent,
+            commands::audit_count,
+            commands::audit_wipe,
             // ===== Computer use =====
             commands::computer_exec_command,
             commands::computer_open_app,

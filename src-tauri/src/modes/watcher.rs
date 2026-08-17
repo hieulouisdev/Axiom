@@ -58,7 +58,10 @@ pub async fn start_watching(
     config: WatchConfig,
     app_handle: tauri::AppHandle,
 ) -> Result<()> {
-    use notify::{RecommendedWatcher, RecursiveMode, Event, EventKind};
+    // v0.3: notify 6.1.1 requires the `Watcher` trait import to call
+    // `watcher.watch(...)` and the `EventHandler` trait to pass an mpsc::Sender
+    // directly to `Watcher::new`. We use the callback-based API instead.
+    use notify::{RecommendedWatcher, RecursiveMode, Event, EventKind, Watcher};
     use std::sync::mpsc;
 
     if config.watch_paths.is_empty() {
@@ -66,11 +69,13 @@ pub async fn start_watching(
         return Ok(());
     }
 
-    let (tx, rx) = mpsc::channel::<Event>();
+    // Build a watcher that funnels events into an mpsc channel via a closure.
+    let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
 
-    let mut watcher: RecommendedWatcher =
-        notify::Watcher::new(tx, std::time::Duration::from_millis(200))
-            .map_err(|e| crate::error::AegisError::Internal(format!("watcher init: {e}")))?;
+    let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
+        let _ = tx.send(res);
+    })
+    .map_err(|e| crate::error::AegisError::Internal(format!("watcher init: {e}")))?;
 
     for path in &config.watch_paths {
         let p = PathBuf::from(path);
@@ -85,12 +90,13 @@ pub async fn start_watching(
         }
     }
 
-    // Spawn a task to process events
+    // Spawn a task to process events.
     tokio::spawn(async move {
+        // Pin the watcher so it lives for the duration of the task.
+        let _watcher = watcher;
         loop {
-            // Check for events without blocking the async runtime
             match rx.try_recv() {
-                Ok(event) => {
+                Ok(Ok(event)) => {
                     let kind_str = match event.kind {
                         EventKind::Create(_) => "create",
                         EventKind::Modify(_) => "modify",
@@ -115,8 +121,13 @@ pub async fn start_watching(
                         }
 
                         // Emit to frontend
+                        // v0.3 fix: `Emitter` trait must be in scope to call `emit`.
+                        use tauri::Emitter as _;
                         let _ = app_handle.emit("watcher://change", &watch_event);
                     }
+                }
+                Ok(Err(e)) => {
+                    tracing::warn!("file watcher error: {e}");
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;

@@ -71,13 +71,13 @@ impl From<rusqlite::Error> for AegisError {
 }
 
 impl serde::Serialize for AegisError {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
 
-        let mut kind = match self {
+        let kind = match self {
             AegisError::Ai(_) => "ai",
             AegisError::AiNotConfigured(_) => "ai_not_configured",
             AegisError::SafetyDenial(_) => "safety_denial",
@@ -93,9 +93,8 @@ impl serde::Serialize for AegisError {
         let mut st = serializer.serialize_struct("AegisError", 3)?;
         st.serialize_field("kind", kind)?;
         st.serialize_field("message", &self.to_string())?;
-        if let AegisError::SafetyConfirmation { token, summary } = self {
+        if let AegisError::SafetyConfirmation { token, .. } = self {
             st.serialize_field("token", token)?;
-            st.serialize_field("summary", summary)?;
         }
         st.end()
     }

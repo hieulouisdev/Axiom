@@ -26,16 +26,6 @@ impl OpenAiProvider {
     }
 }
 
-impl<T> std::ops::Deref for OpenAiProvider
-where
-    T: ?Sized,
-{
-    type Target = OpenAiCompatProvider;
-    fn deref(&self) -> &OpenAiCompatProvider {
-        &self.0
-    }
-}
-
 // Manual Provider impl that delegates to the inner client.
 #[async_trait::async_trait]
 impl Provider for OpenAiProvider {

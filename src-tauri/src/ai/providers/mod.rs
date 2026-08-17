@@ -5,7 +5,13 @@
 //! [`openai_compat`] helper to avoid duplicating HTTP boilerplate, and only
 //! write bespoke clients for providers whose API shape differs materially
 //! (Anthropic Messages API, Google Gemini generateContent, Ollama native API).
+//!
+//! v0.3 introduces [`aegis_cloud`] — the built-in zero-config provider backed
+//! by Z.AI GLM-4.6 that auto-loads an API key from the `AEGIS_DEFAULT_API_KEY`
+//! environment variable. It is the first provider in the registry and the
+//! default active provider when no other has been configured.
 
+pub mod aegis_cloud;
 pub mod openai;
 pub mod anthropic;
 pub mod gemini;
@@ -36,6 +42,7 @@ pub mod deepinfra;
 pub mod fireworks;
 pub mod custom;
 
+pub use aegis_cloud::AegisCloudProvider;
 pub use openai::OpenAiProvider;
 pub use anthropic::AnthropicProvider;
 pub use gemini::GeminiProvider;

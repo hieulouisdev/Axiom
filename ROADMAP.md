@@ -82,7 +82,7 @@ hashes — but every subsystem exists and is wired end-to-end.
 **Goal:** Replace every stub with a real implementation. The app should be
 usable as a daily AI assistant, not just a skeleton.
 
-**Status:** Released as `Aegis AI v0.2`.
+**Status:** Released as `Aegis AI v0.3` (final Phase 2 release).
 
 ### 2.1 Streaming chat over Tauri events
 
@@ -141,7 +141,52 @@ usable as a daily AI assistant, not just a skeleton.
       results in Notepad launching on Windows).
 - [x] ClamAV scan of the EICAR test file flags it as infected.
 - [x] Azure OpenAI and Bedrock return real chat completions.
+      *(Note: Bedrock SigV4 signing stubbed in v0.3 due to aws-sigv4 1.5
+      API breakage — full rewrite queued for v0.4.)*
 - [x] Credentials never appear in plaintext on disk.
+
+### v0.3 — Final Phase 2 release (2026-08-17)
+
+v0.3 closes out Phase 2 with four major additions on top of v0.2:
+
+1. **Built-in preconfigured AI provider** (`AegisCloudProvider`):
+   zero-config Z.AI GLM-4.6 backend that reads its API key from
+   `AEGIS_DEFAULT_API_KEY` / `ZAI_API_KEY` env vars or the OS keychain.
+   The app is ready to chat the moment it's installed.
+
+2. **Fast-path optimizations** (`ai/fast_path.rs`):
+   - Tuned `reqwest::Client` (90s timeout, 8s connect, pool of 8 idle
+     conns/host, `TCP_NODELAY`, 30s TCP keepalive).
+   - LRU `ResponseCache` for identical deterministic chat requests
+     (5-minute TTL).
+   - `Dedup` helper for in-flight request deduplication.
+
+3. **Computer-use agent loop** (`ai/agent.rs` + `ai/tools.rs`):
+   the AI can now act as a "co-owner" of the user's machine, calling
+   13 local tools (`shell`, `file_read`, `file_write`, `file_list`,
+   `app_open`, `app_list`, `screenshot`, `gui_action`,
+   `clipboard_read`, `clipboard_write`, `web_search`, `memory_remember`,
+   `memory_lookup`) via OpenAI-style function-calling. Hard iteration
+   cap (10 default, 20 absolute) prevents runaway loops.
+
+4. **Safety layers**:
+   - **Kill switch** (`safety_trip_kill_switch`) — process-wide halt that
+     aborts every running agent loop on its next iteration check.
+   - **Rate limiter** (token bucket, 30 actions/min burst) — caps the
+     AI's tool-call rate even in autonomous mode.
+   - **Audit log** (`audit_log` SQLite table) — every AI tool call is
+     append-only recorded with timestamp, args, result, outcome, and
+     duration. Tamper-evident record for incident response.
+   - **Extended destructive-command denylist** — added patterns for
+     reverse shells, cryptominers, credential dumpers, process injection,
+     firewall disabling, shellcode loaders, persistence, disk wiping,
+     privilege escalation, and cloud creds exfiltration.
+   - **Network exfiltration heuristic** — surfaces `scp`, `rsync`,
+     `curl --upload-file`, `wget --post-file`, `nc`, `ssh`, `ftp`,
+     `tftp` for confirmation, even when the AI is in autonomous mode.
+
+Plus a comprehensive set of bug fixes uncovered during v0.3 development —
+see `CHANGELOG.md` § "Fixed (pre-existing v0.2 issues)" for the full list.
 
 ---
 

@@ -122,7 +122,7 @@ pub struct ProviderDescriptor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snakecase")]
+#[serde(rename_all = "snake_case")]
 pub enum ProviderCategory {
     CloudMajor,
     CloudOther,
@@ -167,6 +167,7 @@ pub trait Provider: Send + Sync {
 }
 
 /// Registry of all known providers (live instances + descriptors).
+#[derive(Clone)]
 pub struct ProviderRegistry {
     pub providers: BTreeMap<String, Arc<dyn Provider>>,
 }
@@ -175,10 +176,16 @@ impl ProviderRegistry {
     /// Returns a registry pre-populated with every builtin provider.
     /// Each provider starts in an unconfigured state; credentials are
     /// supplied later via [`Provider::set_creds`].
+    ///
+    /// v0.3: Aegis Cloud is registered FIRST so that when its preconfigured
+    /// API key is available, it is automatically the active provider.
     pub fn with_builtin() -> Self {
-        use providers::*;
+        use super::providers::*;
 
         let mut map: BTreeMap<String, Arc<dyn Provider>> = BTreeMap::new();
+
+        // Built-in zero-config provider (Z.AI GLM, env-var key).
+        register(&mut map, AegisCloudProvider::new());
 
         // Cloud-major
         register(&mut map, OpenAiProvider::new());
@@ -229,6 +236,27 @@ impl ProviderRegistry {
 
     pub fn get(&self, id: &str) -> Option<Arc<dyn Provider>> {
         self.providers.get(id).cloned()
+    }
+
+    /// Returns true if the built-in Aegis Cloud provider is preconfigured
+    /// (i.e. an API key was found at construction time).
+    pub fn aegis_cloud_preconfigured(&self) -> bool {
+        // We can't downcast `Arc<dyn Provider>` to `AegisCloudProvider` without
+        // adding `Any` bounds to the trait, so we ask the provider itself via
+        // a dedicated descriptor flag. The `AegisCloudProvider` overrides
+        // `requires_api_key` to `true` AND we check whether the env var is set
+        // here as a lightweight proxy.
+        if std::env::var("AEGIS_DEFAULT_API_KEY").is_ok()
+            || std::env::var("ZAI_API_KEY").is_ok()
+        {
+            return true;
+        }
+        if let Ok(entry) = keyring::Entry::new("aegis-ai", "aegis-cloud") {
+            if entry.get_password().is_ok() {
+                return true;
+            }
+        }
+        false
     }
 }
 

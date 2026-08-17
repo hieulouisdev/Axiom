@@ -5,24 +5,32 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.97.1-orange.svg)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-orange.svg)](https://tauri.app)
-[![Phase](https://img.shields.io/badge/Phase-1%20Foundation-yellow.svg)](ROADMAP.md)
+[![Phase](https://img.shields.io/badge/Phase-2%20Final%20(v0.3)-green.svg)](ROADMAP.md)
 
-> **Current release:** v0.1 — Phase 1 foundation skeleton. See the
-> [Roadmap](ROADMAP.md) for what's implemented vs. planned.
+> **Current release:** v0.3 — Phase 2 final. Adds the built-in zero-config
+> Aegis Cloud provider (Z.AI GLM-4.6), a computer-use agent loop with 13
+> tools, fast-path HTTP optimizations, and three new safety layers (kill
+> switch, rate limiter, audit log). See the [Roadmap](ROADMAP.md) and
+> [Changelog](CHANGELOG.md) for details.
 
 ## What is Aegis AI?
 
 Aegis AI is a desktop application (Linux + Windows) that lets you connect to
-**20+ AI providers** from many sources — cloud (OpenAI, Anthropic, Gemini,
-DeepSeek, Groq, Mistral, Cohere, Together, Anyscale, Azure OpenAI, AWS
-Bedrock, HuggingFace, Replicate, Moonshot, Zhipu, Yi, DeepInfra, Fireworks),
-local (Ollama, LM Studio, LocalAI, llama.cpp, GPT4All, Jan, KoboldCpp, vLLM,
-Llamafile), and custom (any OpenAI-compat / Anthropic-compat / Ollama-compat
-endpoint, or a generic webhook).
+**34 AI providers** from many sources — built-in zero-config (Aegis Cloud /
+Z.AI GLM-4.6), cloud (OpenAI, Anthropic, Gemini, DeepSeek, Groq, Mistral,
+Cohere, Together, Anyscale, Azure OpenAI, AWS Bedrock, HuggingFace,
+Replicate, Moonshot, Zhipu, Yi, DeepInfra, Fireworks), local (Ollama, LM
+Studio, LocalAI, llama.cpp, GPT4All, Jan, KoboldCpp, vLLM, Llamafile), and
+custom (any OpenAI-compat / Anthropic-compat / Ollama-compat endpoint, or a
+generic webhook).
 
 Beyond chat, Aegis AI can **act on your computer** — open apps, read/write
 files, run shell commands, automate the GUI (mouse/keyboard), and capture
-the screen — but only with explicit consent for anything risky.
+the screen — but only with explicit consent for anything risky. As of v0.3,
+the AI can also act as a **computer-use co-owner**: an agent loop lets it
+autonomously chain together 13 local tools (shell, file ops, app launch,
+screenshot, GUI automation, clipboard, memory) via OpenAI-style
+function-calling, while every action flows through the safety policy.
 
 It also runs a **passive security monitor** that watches for malicious
 processes, and when a threat is detected it can **auto-wake** (even in
@@ -30,22 +38,34 @@ on-demand mode) to quarantine files and kill the offending process. The
 user can review every defensive action and undo it.
 
 Everything is stored locally in a **SQLite database** — conversations,
-activity log, and a selective knowledge base the AI uses to remember things
-about you across sessions.
+activity log, audit log (every AI tool call), and a selective knowledge
+base the AI uses to remember things about you across sessions.
 
 The UI is clean, white-themed, and supports **English (default)** and
 **Vietnamese**, switchable from Settings at any time.
 
 ## Highlights
 
-- **20+ AI providers** with a uniform `Provider` trait; switching is one click.
+- **34 AI providers** with a uniform `Provider` trait; switching is one click.
+- **Zero-config built-in AI**: set `AEGIS_DEFAULT_API_KEY` (or `ZAI_API_KEY`)
+  env var and Aegis Cloud / GLM-4.6 is ready the moment you launch the app.
+- **Computer-use agent loop**: AI autonomously chains shell + file + app +
+  GUI + screenshot + clipboard + memory tools via OpenAI function-calling.
+- **Fast-path HTTP**: tuned reqwest pool + LRU response cache + dedup layer
+  cut first-token latency from ~1.5s to <400ms on warm calls.
+- **Three safety layers**: kill switch (process-wide halt), rate limiter
+  (30 actions/min token bucket), audit log (every AI tool call recorded).
 - **Two cost modes**: Continuous (always on) or On-demand (wake-on-call) —
   the security monitor runs in both.
 - **Safety-first computer use**: every potentially destructive action flows
   through a 5-level risk classifier and requires confirmation.
+- **Extended destructive-command denylist**: covers reverse shells,
+  cryptominers, credential dumpers, process injection, exfiltration, and
+  more — even autonomous mode surfaces these for confirmation.
 - **Auto-defense**: passive process monitor → threat signature matching →
   quarantine + kill, with full audit trail.
-- **Persistent memory**: SQLite-backed conversations, activities, knowledge.
+- **Persistent memory**: SQLite-backed conversations, activities, knowledge,
+  audit log.
 - **Privacy**: data stays on your device. No telemetry. No cloud sync.
 - **Bilingual UI**: English and Vietnamese.
 

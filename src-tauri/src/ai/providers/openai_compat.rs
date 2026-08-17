@@ -184,7 +184,7 @@ impl Provider for OpenAiCompatProvider {
                 if line.is_empty() || !line.starts_with("data:") {
                     continue;
                 }
-                let data = &line[5..].trim_start();
+                let data = line[5..].trim_start();
                 if data == "[DONE]" {
                     on_chunk(ChatStreamChunk { delta: String::new(), done: true });
                     continue;
@@ -195,10 +195,10 @@ impl Provider for OpenAiCompatProvider {
                     }
                     if let Some(choice) = parsed.choices.first() {
                         if let Some(delta) = choice.delta.as_ref() {
-                            if let Some(content) = delta.content.as_ref() {
-                                full.push_str(content);
+                            if !delta.content.is_empty() {
+                                full.push_str(&delta.content);
                                 on_chunk(ChatStreamChunk {
-                                    delta: content.clone(),
+                                    delta: delta.content.clone(),
                                     done: false,
                                 });
                             }
@@ -259,7 +259,7 @@ pub async fn parse_sse_stream(
             if line.is_empty() || !line.starts_with("data:") {
                 continue;
             }
-            let data = &line[5..].trim_start();
+            let data = line[5..].trim_start();
             if data == "[DONE]" {
                 on_chunk(ChatStreamChunk { delta: String::new(), done: true });
                 continue;
@@ -270,10 +270,10 @@ pub async fn parse_sse_stream(
                 }
                 if let Some(choice) = parsed.choices.first() {
                     if let Some(delta) = choice.delta.as_ref() {
-                        if let Some(content) = delta.content.as_ref() {
-                            full.push_str(content);
+                        if !delta.content.is_empty() {
+                            full.push_str(&delta.content);
                             on_chunk(ChatStreamChunk {
-                                delta: content.clone(),
+                                delta: delta.content.clone(),
                                 done: false,
                             });
                         }

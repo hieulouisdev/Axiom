@@ -56,7 +56,8 @@ pub async fn start(state: Arc<Mutex<AppState>>) -> anyhow::Result<()> {
         // Apply threat signatures.
         let signatures = {
             let s = state.lock();
-            s.config.read().security.threat_signatures.clone()
+            let __moved = s.config.read().security.threat_signatures.clone();
+            __moved
         };
 
         let mut new_threats: Vec<Threat> = Vec::new();
@@ -81,19 +82,22 @@ pub async fn start(state: Arc<Mutex<AppState>>) -> anyhow::Result<()> {
         }
 
         if !new_threats.is_empty() {
-            let mut recent = RECENT_THREATS.lock();
-            for t in &new_threats {
-                tracing::warn!(
-                    "threat detected: {} (pid={}, sig={})",
-                    t.process_name,
-                    t.pid,
-                    t.signature_name
-                );
+            // v0.3 fix: scope the RECENT_THREATS lock so it's released before
+            // we await notify_threats — the MutexGuard is not Send.
+            {
+                let mut recent = RECENT_THREATS.lock();
+                for t in &new_threats {
+                    tracing::warn!(
+                        "threat detected: {} (pid={}, sig={})",
+                        t.process_name,
+                        t.pid,
+                        t.signature_name
+                    );
+                }
+                recent.extend(new_threats.iter().cloned());
+                recent.truncate(200); // keep most recent 200
             }
-            recent.extend(new_threats.iter().cloned());
-            recent.truncate(200); // keep most recent 200
-            drop(recent);
-            // Wake the defender.
+            // Wake the defender (lock is now released, safe to await).
             crate::security::defender::notify_threats(new_threats).await;
         }
 

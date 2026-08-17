@@ -4,12 +4,20 @@
 //! read/write files, execute shell commands, automate the GUI (mouse/keyboard),
 //! and capture the screen. Every potentially destructive operation flows
 //! through the [`safety`] module which may require explicit user confirmation.
+//!
+//! v0.3 adds three new safety layers:
+//! - [`kill_switch`] — process-wide halt that aborts every running agent loop.
+//! - [`rate_limiter`] — token-bucket limiter (30 actions/min by default).
+//! - [`audit`] — append-only SQLite record of every AI tool call.
 
 pub mod apps;
+pub mod audit;
 pub mod automation;
 pub mod clipboard;
 pub mod commands;
 pub mod files;
+pub mod kill_switch;
+pub mod rate_limiter;
 pub mod safety;
 pub mod screen;
 

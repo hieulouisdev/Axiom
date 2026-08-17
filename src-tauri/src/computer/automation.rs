@@ -6,11 +6,15 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+// v0.3 fix: enigo 0.2 exposes methods via traits — we must import them to
+// bring `move_mouse`, `button`, `text`, `key`, `scroll` into scope on `&mut Enigo`.
+use enigo::{Keyboard, Mouse};
+
 use crate::error::{AegisError, Result};
 
 /// A single declarative GUI action.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snakecase")]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AutoAction {
     /// Move the mouse to (x, y).
     MouseMove { x: i32, y: i32 },
@@ -79,9 +83,9 @@ fn mouse_click(enigo: &mut enigo::Enigo, x: i32, y: i32, button: &MouseButton) -
         .map_err(|e| AegisError::Internal(format!("mouse_move: {e}")))?;
 
     let enigo_button = match button {
-        MouseButton::Left => enigo::MouseButton::Left,
-        MouseButton::Right => enigo::MouseButton::Right,
-        MouseButton::Middle => enigo::MouseButton::Middle,
+        MouseButton::Left => enigo::Button::Left,
+        MouseButton::Right => enigo::Button::Right,
+        MouseButton::Middle => enigo::Button::Middle,
     };
 
     enigo.button(enigo_button, enigo::Direction::Press)
@@ -146,8 +150,8 @@ fn mouse_scroll(enigo: &mut enigo::Enigo, x: i32, y: i32, delta: i32) -> Result<
     enigo.move_mouse(x, y, enigo::Coordinate::Abs)
         .map_err(|e| AegisError::Internal(format!("mouse_move: {e}")))?;
 
-    // enigo scrolls vertically with positive = down, negative = up
-    enigo.scroll(enigo::ScrollDirection::Vertical, delta)
+    // enigo 0.2: `scroll(length, axis)` — positive = down/right, negative = up/left.
+    enigo.scroll(delta, enigo::Axis::Vertical)
         .map_err(|e| AegisError::Internal(format!("mouse_scroll: {e}")))?;
 
     tracing::debug!("mouse_scroll at ({}, {}) delta={}", x, y, delta);
@@ -197,7 +201,6 @@ fn parse_key(s: &str) -> Option<enigo::Key> {
         "f11" => Some(Key::F11),
         "f12" => Some(Key::F12),
         "capslock" | "caps_lock" => Some(Key::CapsLock),
-        "numlock" | "num_lock" => Some(Key::NumLock),
         "scrolllock" | "scroll_lock" => Some(Key::ScrollLock),
         "insert" => Some(Key::Insert),
         "ctrl" | "control" => Some(Key::Control),

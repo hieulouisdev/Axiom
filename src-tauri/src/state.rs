@@ -92,7 +92,8 @@ impl AppState {
 
         let cfg = {
             let s = state.lock();
-            s.config.read().clone()
+            let __moved = s.config.read().clone();
+            __moved
         };
 
         let memory = MemoryStore::open(&db_path)?;

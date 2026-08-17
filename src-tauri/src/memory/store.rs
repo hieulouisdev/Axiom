@@ -110,6 +110,10 @@ impl MemoryStore {
             );
             "#,
         )?;
+
+        // v0.3: audit log table — every AI tool call is recorded here.
+        crate::computer::audit::migrate(&conn)?;
+
         Ok(())
     }
 

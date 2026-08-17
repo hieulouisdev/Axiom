@@ -204,6 +204,10 @@ pub struct CustomOllamaProvider {
 }
 
 impl CustomOllamaProvider {
+    fn creds(&self) -> ProviderCreds {
+        self.creds.read().unwrap().clone()
+    }
+
     pub fn new() -> Arc<Self> {
         let desc = ProviderDescriptor {
             id: "custom_ollama".into(),
@@ -302,6 +306,10 @@ pub struct WebhookProvider {
 }
 
 impl WebhookProvider {
+    fn creds(&self) -> ProviderCreds {
+        self.creds.read().unwrap().clone()
+    }
+
     pub fn new() -> Arc<Self> {
         let desc = ProviderDescriptor {
             id: "webhook".into(),

@@ -27,7 +27,7 @@ use super::Severity;
 
 /// A defensive action taken by the system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snakecase")]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum DefenseEvent {
     Notified { threat_id: String, message: String },
     Quarantined { threat_id: String, file_path: String },
@@ -72,7 +72,8 @@ pub async fn start(state: Arc<Mutex<AppState>>) -> anyhow::Result<()> {
             let (auto_defense, app_handle) = {
                 let s = state.lock();
                 let cfg = s.config.read();
-                (cfg.security.auto_defense, s.app_handle.lock().clone())
+                let __moved = (cfg.security.auto_defense, s.app_handle.lock().clone());
+                __moved
             };
 
             for t in threats {

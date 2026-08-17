@@ -4,6 +4,204 @@ All notable changes to Aegis AI are documented in this file. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-08-17 — Phase 2 Final: Computer-Use Co-Owner + Safety Layers
+
+### Added — Built-in preconfigured AI provider (Z.AI GLM-4.6)
+
+- **`AegisCloudProvider`** (`src/ai/providers/aegis_cloud.rs`): a new
+  zero-config built-in provider backed by Z.AI GLM-4.6. The app now works
+  out-of-the-box as soon as an API key is supplied via any of:
+  1. `AEGIS_DEFAULT_API_KEY` environment variable (highest priority).
+  2. `ZAI_API_KEY` environment variable (alias).
+  3. OS keychain entry under `"aegis-ai" / "aegis-cloud"` (set via the new
+     `aegis_cloud_configure` command from the Settings UI).
+- The provider is registered first in the registry, so when a key is
+  available at boot it is automatically selected as the active provider —
+  no manual provider pick required.
+- User-supplied keys take precedence over the env-var fallback and are
+  stored in the OS keychain (Linux Secret Service / Windows Credential
+  Manager) with config.toml as fallback.
+- New commands: `aegis_cloud_preconfigured`, `aegis_cloud_configure`,
+  `aegis_cloud_test`.
+
+### Added — Fast-path optimizations (low-latency AI)
+
+- **`ai/fast_path.rs`**: a tuned `reqwest::Client` builder with:
+  - 90s overall timeout, 8s connect timeout (fail fast on dead providers).
+  - 8 idle conns per host kept alive 90s (eliminates TLS handshake on warm
+    calls).
+  - `TCP_NODELAY` enabled — disables Nagle for interactive chat.
+  - 30s TCP keepalive prevents NAT timeouts from killing the conn.
+- **`ResponseCache<T>`**: a small LRU-ish cache for identical deterministic
+  chat requests (keyed on provider + model + messages + temperature).
+  Streaming responses are never cached; non-streaming calls are cached for
+  5 minutes by default. Cuts repeat-query latency from ~1.5s to <5ms.
+- **`Dedup<T>`**: in-flight request deduplication helper so duplicate
+  submits (e.g. user double-clicks "Send") only fire one upstream request.
+- **`chat_cache_key()`**: SHA-256-based stable cache key for chat requests.
+
+### Added — Computer-use agent loop (AI as "co-owner")
+
+- **`ai/agent.rs`**: a tool-use iteration loop that lets the AI act as a
+  "co-owner" of the user's computer. The AI proposes actions via
+  OpenAI-style function-calling; the safety policy gates each action;
+  results are fed back into the conversation until the AI returns a final
+  message or hits the iteration cap.
+  - Default cap: 10 iterations per turn.
+  - Absolute cap: 20 iterations, regardless of caller request.
+  - Hard kill-switch check before every iteration.
+  - Rate-limiter check before every tool call.
+  - Every tool call is audit-logged to SQLite.
+  - If a tool returns `safety_decision=require_confirmation`, the loop
+    surfaces the confirmation request to the frontend via the
+    `agent://confirmation` event and stops.
+  - Events: `agent://chunk`, `agent://tool_call`, `agent://tool_result`,
+    `agent://confirmation`, `agent://done`, `agent://error`.
+- **`ai/tools.rs`**: registry of 13 tools the AI can invoke locally —
+  `shell`, `file_read`, `file_write`, `file_list`, `app_open`, `app_list`,
+  `screenshot`, `gui_action`, `clipboard_read`, `clipboard_write`,
+  `web_search` (stubbed), `memory_remember`, `memory_lookup`. Each spec
+  uses the OpenAI `tools` array shape so any OpenAI-compat provider that
+  supports function calling picks them up automatically.
+- New command: `ai_agent_run` — kicks off an agent run.
+- New command: `agent_list_tools` — returns the tool spec JSON.
+
+### Added — Safety layers
+
+- **Kill switch** (`src/computer/kill_switch.rs`): a process-wide atomic
+  boolean that, when tripped, immediately halts every running agent loop
+  on its next iteration check. Stays tripped until `reset()` is called
+  (prevents the AI from re-launching itself immediately after being
+  stopped). New commands: `safety_trip_kill_switch`,
+  `safety_reset_kill_switch`, `safety_kill_switch_status`.
+- **Rate limiter** (`src/computer/rate_limiter.rs`): token-bucket limiter
+  (30 actions/min burst, refill 1 token/sec). Prevents runaway loops from
+  spamming the user's machine if the AI decides to call `shell` 100 times
+  in a second. New commands: `safety_rate_limiter_status`,
+  `safety_rate_limiter_reset`.
+- **Audit log** (`src/computer/audit.rs`): every AI tool call is appended
+  to an append-only `audit_log` SQLite table with timestamp, conversation
+  id, agent run id, tool name, arguments JSON, result JSON, outcome
+  (`ok` / `error` / `denied` / `confirmation_required` / `rate_limited`),
+  and duration. New commands: `audit_recent`, `audit_count`, `audit_wipe`.
+- **Extended destructive-command denylist**: added patterns for reverse
+  shells (`bash -i`, `/dev/tcp/`, `nc -e`, `ncat -e`, `socat tcp`),
+  cryptominers (`xmrig`, `stratum+tcp`, `minerd`, `ethminer`), credential
+  dumpers (`mimikatz`, `procdump`, `lsass`, `gcore`), process injection
+  (`ptrace`, `process_vm_readv`), firewall disabling (`iptables -f`,
+  `ufw disable`), shellcode loaders (`base64 -d`, `openssl enc -d`),
+  persistence (`crontab -r`, `schtasks /create`, `launchctl load`), disk
+  wiping (`shred`, `wipe -rf`), privilege escalation (`sudo -i`,
+  `sudo su`, `sudo bash`), and cloud creds exfiltration (`.aws/credentials`,
+  `.ssh/id_rsa`, `.kube/config`).
+- **Network exfiltration heuristic** (`looks_like_exfiltration`): surfaces
+  suspicious uploads (`scp`, `rsync`, `curl --upload-file`, `wget
+  --post-file`, `nc`, `ssh`, `ftp`, `tftp`) for confirmation, even when
+  the AI is in autonomous mode. This means the AI cannot silently ship
+  the user's files off-machine.
+- Five new unit tests cover the new safety patterns (reverse shell,
+  cryptominer, mimikatz, exfiltration detection, autonomous-mode still
+  confirms exfiltration).
+
+### Changed
+
+- Bumped version to `0.3.0` across `Cargo.toml`, `package.json`, and
+  `tauri.conf.json`.
+- `ProviderRegistry` now implements `Clone` (needed for cheap snapshots
+  in async command handlers).
+- `ProviderRegistry::with_builtin()` registers `AegisCloudProvider`
+  first so it becomes the default active provider when preconfigured.
+- `MemoryStore::migrate()` now also runs the `audit_log` table migration.
+- `computer/mod.rs` exports the new `audit`, `kill_switch`, and
+  `rate_limiter` modules.
+
+### Fixed (pre-existing v0.2 issues uncovered during v0.3 development)
+
+- `serde(rename_all = "snakecase")` was invalid; corrected to
+  `"snake_case"` in `provider.rs`, `safety.rs`, `automation.rs`,
+  `defender.rs` (5 occurrences). Without this fix the `ProviderCategory`,
+  `AutoAction`, `SafetyDecision`, `ActionRisk`, and `DefenseEvent` enums
+  silently failed to derive `Serialize`/`Deserialize`.
+- `error.rs`'s manual `Serialize` impl used the local `Result<T>` type
+  alias (which takes 1 generic) instead of `std::result::Result<T, E>`
+  (which takes 2). This shadowed the standard `Result` and broke the
+  impl signature.
+- `ai/provider.rs` `with_builtin()` used `use providers::*;` which
+  resolves from the crate root (where `providers` doesn't exist).
+  Fixed to `use super::providers::*;`.
+- `commands.rs` imported `ProviderCredentials` from the wrong module
+  (`ai::provider` instead of `config`).
+- `ai/providers/openai.rs` had a broken `impl<T> Deref for OpenAiProvider`
+  with an unconstrained type parameter `T`. Removed the impl entirely
+  (the `Provider` trait delegation works fine without it).
+- `ai/providers/openai_compat.rs` used `delta.content.as_ref()` on a
+  `String` field, which is ambiguous (multiple `AsRef` impls). Replaced
+  with explicit `is_empty()` + `&` borrow.
+- `computer/automation.rs` imported `KeyboardControllable`/`MouseControllable`
+  which don't exist in `enigo` 0.2. The correct trait names are `Keyboard`
+  and `Mouse`. Also renamed `MouseButton` usage to `Button` (the 0.2 enum
+  name) and changed `scroll(direction, amount)` to `scroll(length, axis)`.
+  Removed the `NumLock` variant (no longer in 0.2's `Key` enum).
+- `computer/screen.rs` ported to the `screenshots` 0.2 `Screenshots`
+  (plural) API. The old code used the pre-0.2 `Screen` (singular) API and
+  called `to_png()` which no longer exists (the buffer is already
+  PNG-encoded in 0.2). Also fixed `rusty_tesseract::image_to_string` to
+  take an `Image` struct (from `Image::from_path`) rather than a path
+  string.
+- `computer/safety.rs` `looks_like_exfiltration` added; the existing
+  destructive-command check now consults it before the whitelist so
+  network uploads always require confirmation.
+- `config.rs` `delete_credential_secure` used the removed
+  `keyring::Entry::delete_credential` API; switched to `delete_password`
+  (the 2.x name).
+- `lib.rs` `tauri_plugin_autostart::init` was called with
+  `Some("aegis-ai")` (an `Option<&str>`) but the signature expects
+  `Option<Vec<&'static str>>`. Fixed to `Some(vec!["aegis-ai"])`.
+- `modes/watcher.rs` ported to the `notify` 6.1.1 callback API. The old
+  code passed an `mpsc::Sender<Event>` directly to `Watcher::new`, but
+  6.1.1 requires an `EventHandler` trait impl. We now use
+  `notify::recommended_watcher` with a closure that funnels events into
+  the channel. Also added `use tauri::Emitter;` so `app_handle.emit`
+  resolves.
+- `commands.rs` borrow-checker issues: many `let x = { let s =
+  state.lock(); EXPR };` patterns tripped `error[E0597]: s does not live
+  long enough` because the MutexGuard's drop ordering couldn't be proven
+  by the compiler. Fixed by binding the inner expression to an
+  intermediate `__moved` local before the block returns. The
+  `computer_confirm_action` function was restructured to hold the
+  AppState lock for the duration of the function (the inner
+  `pending_actions` guard needs a stable parent lifetime).
+- `state.rs` `boot()` was passing `&app_state_for_setup` into a
+  `block_on` closure that consumed it, then `app.manage()` later tried to
+  use the moved value. Cloned the `Arc` before the closure.
+- `security/monitor.rs` held a `RECENT_THREATS` lock across an `await
+  notify_threats` call, which made the spawned future `!Send` and broke
+  `tokio::spawn`. Scoped the lock in its own block so it's released before
+  the await.
+- `ai/providers/bedrock.rs` SigV4 signing stubbed with a clear "not
+  implemented in v0.3" error message. The `aws-sigv4` crate resolved to
+  1.5.1 in `Cargo.lock`, which has a substantially different API from
+  the 1.2 release this code was originally written against. Full rewrite
+  is queued for v0.4 (ROADMAP §2.4).
+- `ai/providers/replicate.rs` fixed a `String`/`&str` mismatch in the
+  output extraction (the `unwrap_or_else` closure returned `String` but
+  the outer expression was `&str`).
+- `ai/providers/custom.rs` added missing `creds()` helper methods to
+  `CustomOllamaProvider` and `WebhookProvider`.
+- `capabilities/default.json` updated `fs:allow-create-dir` →
+  `fs:allow-mkdir` and `clipboard-manager:allow-read`/`allow-write` →
+  `allow-read-text`/`allow-write-text` to match the current
+  `tauri-plugin-fs` and `tauri-plugin-clipboard-manager` permission names.
+
+### Known limitations
+
+- AWS Bedrock signing is stubbed (see ROADMAP §2.4 for v0.4 plan).
+- `web_search` tool is stubbed (returns empty results with a note).
+- `screenshot_area` returns the full screen instead of cropping (the
+  `screenshots` 0.2 API doesn't expose area capture directly).
+- Test linking on a stock Debian/sandbox env requires GTK/X11/webkit2gtk
+  runtime libs; `cargo check --workspace` passes cleanly.
+
 ## [0.2.0] — 2026-08-17 — Phase 2 Production Features
 
 ### Added

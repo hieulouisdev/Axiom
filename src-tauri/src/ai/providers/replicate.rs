@@ -214,19 +214,19 @@ impl Provider for ReplicateProvider {
         let result = self.poll_prediction(&prediction_id, &api_key).await?;
 
         // Extract output
-        let output = result["output"].as_str()
-            .unwrap_or_else(|| {
-                // Try as array of strings
-                result["output"].as_array()
-                    .map(|arr| arr.iter()
-                        .filter_map(|v| v.as_str())
-                        .collect::<Vec<_>>()
-                        .join(""))
-                    .unwrap_or_default()
-            });
+        let output_owned: String = if let Some(s) = result["output"].as_str() {
+            s.to_string()
+        } else if let Some(arr) = result["output"].as_array() {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .collect::<Vec<_>>()
+                .join("")
+        } else {
+            String::new()
+        };
 
         Ok(ChatResponse {
-            message: ChatMessage::assistant(output.to_string()),
+            message: ChatMessage::assistant(output_owned),
             model,
             usage: None, // Replicate doesn't report token usage in the same way
         })

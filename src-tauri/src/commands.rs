@@ -13,7 +13,7 @@ use tauri::State;
 use tauri::Emitter;
 
 use crate::{
-    ai::provider::{ChatMessage, ChatRequest, ChatStreamChunk, ProviderCredentials},
+    ai::provider::{ChatMessage, ChatRequest, ChatStreamChunk},
     computer::{
         apps::{list_apps, open_app, AppDescriptor},
         automation::{auto_perform, AutoAction},
@@ -26,7 +26,7 @@ use crate::{
         safety::{SafetyPolicy},
         screenshot,
     },
-    config::{AppConfig, OperatingMode},
+    config::{AppConfig, OperatingMode, ProviderCredentials},
     error::{AegisError, Result},
     i18n,
     memory::{ActivityRecord, Conversation, KnowledgeEntry, Message},
@@ -58,7 +58,8 @@ pub async fn ai_chat(
 ) -> Result<ChatResponseDto> {
     let providers = {
         let s = state.lock();
-        s.providers.lock().clone()
+        let __moved = (*s.providers.lock()).clone();
+        __moved
     };
     let router = {
         let s = state.lock();
@@ -177,7 +178,8 @@ pub async fn ai_chat_stream(
 ) -> Result<ChatStreamStartDto> {
     let providers = {
         let s = state.lock();
-        s.providers.lock().clone()
+        let __moved = (*s.providers.lock()).clone();
+        __moved
     };
     let router = {
         let s = state.lock();
@@ -234,9 +236,13 @@ pub async fn ai_chat_stream(
     // Spawn the streaming task
     tokio::spawn(async move {
         let app_for_chunk = app.clone();
+        // Clone stream_id once per closure scope so we can use it in both the
+        // chunk callback and the error handler without move conflicts.
+        let stream_id_for_chunk = stream_id_clone.clone();
+        let stream_id_for_err = stream_id_clone.clone();
         let on_chunk: Box<dyn Fn(ChatStreamChunk) + Send + Sync> = Box::new(move |chunk| {
             let _ = app_for_chunk.emit("chat://chunk", &serde_json::json!({
-                "stream_id": stream_id_clone,
+                "stream_id": stream_id_for_chunk,
                 "delta": chunk.delta,
                 "done": chunk.done,
             }));
@@ -265,7 +271,7 @@ pub async fn ai_chat_stream(
                     }
                     Err(e) => {
                         let _ = app.emit("chat://error", &serde_json::json!({
-                            "stream_id": stream_id_clone,
+                            "stream_id": stream_id_for_err,
                             "error": e.to_string(),
                         }));
                     }
@@ -338,7 +344,16 @@ pub fn ai_list_providers(state: State<'_, Arc<Mutex<AppState>>>) -> Vec<Provider
         .list()
         .into_iter()
         .map(|d| {
+            // Pre-compute the active flag before moving `d.id` into the struct.
+            let is_active = cfg.active_provider.as_deref() == Some(&d.id);
             let creds = cfg.providers.credentials.get(&d.id);
+            // Pre-compute flags that depend on `d`/`creds` so we don't borrow
+            // moved values later.
+            let requires_api_key = d.requires_api_key;
+            let enabled = creds.map(|c| c.enabled).unwrap_or(false);
+            let configured = creds
+                .map(|c| c.api_key.is_some() || !requires_api_key || c.base_url.is_some())
+                .unwrap_or(false);
             ProviderDto {
                 id: d.id,
                 name: d.name,
@@ -351,11 +366,9 @@ pub fn ai_list_providers(state: State<'_, Arc<Mutex<AppState>>>) -> Vec<Provider
                 default_model: d.default_model,
                 known_models: d.known_models,
                 implemented: d.implemented,
-                enabled: creds.map(|c| c.enabled).unwrap_or(false),
-                is_active: cfg.active_provider.as_deref() == Some(&d.id),
-                configured: creds.map(|c| {
-                    c.api_key.is_some() || !d.requires_api_key || c.base_url.is_some()
-                }).unwrap_or(false),
+                enabled,
+                is_active,
+                configured,
             }
         })
         .collect()
@@ -452,7 +465,8 @@ pub async fn ai_test_provider(
 ) -> Result<()> {
     let providers = {
         let s = state.lock();
-        s.providers.lock().clone()
+        let __moved = (*s.providers.lock()).clone();
+        __moved
     };
     let provider = providers.get(&provider_id).ok_or_else(|| {
         AegisError::AiNotConfigured(format!("provider '{provider_id}' not registered"))
@@ -498,7 +512,8 @@ pub fn computer_exec_command(
 ) -> Result<ExecResult> {
     let policy = {
         let s = state.lock();
-        SafetyPolicy::from_config(&s.config.read())
+        let __moved = SafetyPolicy::from_config(&s.config.read());
+        __moved
     };
     if params.authorized {
         let r = crate::computer::commands::exec_command_authorized(&params.command)?;
@@ -528,7 +543,8 @@ pub fn computer_open_app(
 ) -> Result<()> {
     let policy = {
         let s = state.lock();
-        SafetyPolicy::from_config(&s.config.read())
+        let __moved = SafetyPolicy::from_config(&s.config.read());
+        __moved
     };
     if authorized {
         return crate::computer::apps::open_app_authorized(&name);
@@ -560,7 +576,8 @@ pub fn computer_file_write(
 ) -> Result<()> {
     let policy = {
         let s = state.lock();
-        SafetyPolicy::from_config(&s.config.read())
+        let __moved = SafetyPolicy::from_config(&s.config.read());
+        __moved
     };
     if params.authorized {
         return crate::computer::files::file_write_authorized(&params.path, &params.content);
@@ -629,10 +646,10 @@ pub fn computer_confirm_action(
     state: State<'_, Arc<Mutex<AppState>>>,
     params: ConfirmActionParams,
 ) -> Result<()> {
-    let mut pending_map = {
-        let s = state.lock();
-        s.pending_actions.lock()
-    };
+    // v0.3 fix: hold the AppState lock for the duration of the function so the
+    // inner `pending_actions` MutexGuard has a stable lifetime.
+    let s = state.lock();
+    let mut pending_map = s.pending_actions.lock();
 
     let pending = pending_map.remove(&params.token)
         .ok_or_else(|| AegisError::SafetyDenial(
@@ -756,7 +773,8 @@ pub async fn memory_summarize(
 ) -> Result<String> {
     let providers = {
         let s = state.lock();
-        s.providers.lock().clone()
+        let __moved = (*s.providers.lock()).clone();
+        __moved
     };
     let router = {
         let s = state.lock();
@@ -852,7 +870,8 @@ pub fn security_quarantine_list(
     state: State<'_, Arc<Mutex<AppState>>>,
 ) -> Vec<QuarantineEntry> {
     let s = state.lock();
-    s.quarantine.lock().list().to_vec()
+    let __moved = s.quarantine.lock().list().to_vec();
+    __moved
 }
 
 #[tauri::command]
@@ -861,7 +880,8 @@ pub fn security_restore_file(
     id: String,
 ) -> Result<()> {
     let s = state.lock();
-    s.quarantine.lock().restore(&id)
+    let __moved = s.quarantine.lock().restore(&id);
+    __moved
 }
 
 #[tauri::command]
@@ -903,7 +923,8 @@ pub fn security_network_scan() -> Vec<NetworkAnomaly> {
 #[tauri::command]
 pub fn modes_get_active(state: State<'_, Arc<Mutex<AppState>>>) -> Mode {
     let s = state.lock();
-    s.config.read().mode.into()
+    let __moved = s.config.read().mode.clone().into();
+    __moved
 }
 
 #[tauri::command]
@@ -1003,6 +1024,186 @@ pub fn app_version() -> String {
 #[tauri::command]
 pub fn app_quit(app: tauri::AppHandle) {
     app.exit(0);
+}
+
+// ===========================================================================
+// v0.3 — Agent loop (computer-use co-owner)
+// ===========================================================================
+
+/// Kick off an agent run: the AI autonomously decides which tools to call,
+/// dispatches them through the safety policy, and returns the final reply.
+///
+/// Emits `agent://tool_call`, `agent://tool_result`, `agent://confirmation`,
+/// `agent://done`, and `agent://error` events to the frontend.
+#[tauri::command]
+pub async fn ai_agent_run(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    app: tauri::AppHandle,
+    params: crate::ai::agent::AgentRunParams,
+) -> Result<String> {
+    let state_inner = state.inner().clone();
+    crate::ai::agent::run_agent_loop(state_inner, app, params).await
+}
+
+/// Trip the kill switch — aborts every running agent loop on its next iteration.
+#[tauri::command]
+pub fn safety_trip_kill_switch() -> Result<()> {
+    crate::computer::kill_switch::trip();
+    Ok(())
+}
+
+/// Reset the kill switch — allows new agent runs.
+#[tauri::command]
+pub fn safety_reset_kill_switch() -> Result<()> {
+    crate::computer::kill_switch::reset();
+    Ok(())
+}
+
+/// Returns the current kill-switch state.
+#[tauri::command]
+pub fn safety_kill_switch_status() -> bool {
+    crate::computer::kill_switch::is_tripped()
+}
+
+/// Returns the current rate-limiter state: tokens available + max capacity.
+#[tauri::command]
+pub fn safety_rate_limiter_status() -> RateLimiterStatus {
+    RateLimiterStatus {
+        available_tokens: crate::computer::rate_limiter::available_tokens(),
+        capacity: 30.0,
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct RateLimiterStatus {
+    pub available_tokens: f64,
+    pub capacity: f64,
+}
+
+/// Reset the rate limiter to full (used after explicit user override).
+#[tauri::command]
+pub fn safety_rate_limiter_reset() -> Result<()> {
+    crate::computer::rate_limiter::reset();
+    Ok(())
+}
+
+/// Return the last N audit entries (newest first).
+#[tauri::command]
+pub fn audit_recent(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    limit: Option<u32>,
+) -> Result<Vec<crate::computer::audit::AuditEntry>> {
+    let s = state.lock();
+    let conn = s.memory.shared_conn();
+    let conn = conn.lock();
+    crate::computer::audit::recent(&conn, limit.unwrap_or(50))
+}
+
+/// Total audit log size.
+#[tauri::command]
+pub fn audit_count(state: State<'_, Arc<Mutex<AppState>>>) -> Result<u64> {
+    let s = state.lock();
+    let conn = s.memory.shared_conn();
+    let conn = conn.lock();
+    crate::computer::audit::count(&conn)
+}
+
+/// Wipe the audit log entirely (used by `aegis forget`).
+#[tauri::command]
+pub fn audit_wipe(state: State<'_, Arc<Mutex<AppState>>>) -> Result<()> {
+    let s = state.lock();
+    let conn = s.memory.shared_conn();
+    let conn = conn.lock();
+    crate::computer::audit::wipe(&conn)
+}
+
+/// Returns whether the built-in Aegis Cloud provider is preconfigured (i.e.
+/// the env var `AEGIS_DEFAULT_API_KEY` or `ZAI_API_KEY` is set, or a key
+/// was found in the OS keychain).
+#[tauri::command]
+pub fn aegis_cloud_preconfigured(state: State<'_, Arc<Mutex<AppState>>>) -> bool {
+    let s = state.lock();
+    let registry = s.providers.lock();
+    registry.aegis_cloud_preconfigured()
+}
+
+/// Configure the Aegis Cloud provider with a user-supplied API key.
+/// The key is stored in the OS keychain (with config.toml fallback).
+#[tauri::command]
+pub fn aegis_cloud_configure(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    api_key: String,
+) -> Result<()> {
+    // Store in keychain under the "aegis-cloud" keyring user.
+    if !api_key.trim().is_empty() {
+        match keyring::Entry::new("aegis-ai", "aegis-cloud") {
+            Ok(entry) => {
+                if let Err(e) = entry.set_password(&api_key) {
+                    tracing::warn!("aegis-cloud keyring write failed: {e}");
+                }
+            }
+            Err(e) => tracing::warn!("aegis-cloud keyring entry creation failed: {e}"),
+        }
+    }
+    // Inject into the live provider + persist a config entry so the UI shows
+    // it as configured.
+    {
+        let s = state.lock();
+        let registry = s.providers.lock();
+        if let Some(p) = registry.get("aegis-cloud") {
+            let creds = crate::ai::provider::ProviderCreds {
+                api_key: Some(api_key.clone()),
+                base_url: Some(crate::ai::providers::aegis_cloud::DEFAULT_BASE_URL.into()),
+                model: Some(crate::ai::providers::aegis_cloud::DEFAULT_MODEL.into()),
+                extra: Default::default(),
+            };
+            p.set_creds(creds);
+        }
+        let mut config = s.config.write();
+        config.providers.credentials.insert(
+            "aegis-cloud".into(),
+            crate::config::ProviderCredentials {
+                api_key: Some(api_key),
+                base_url: Some(crate::ai::providers::aegis_cloud::DEFAULT_BASE_URL.into()),
+                model: Some(crate::ai::providers::aegis_cloud::DEFAULT_MODEL.into()),
+                enabled: true,
+                extra: Default::default(),
+            },
+        );
+        // Make Aegis Cloud the active provider if none is selected.
+        if config.active_provider.is_none() {
+            config.active_provider = Some("aegis-cloud".into());
+        }
+        config.save()?;
+    }
+    let router = {
+        let s = state.lock();
+        s.router.clone()
+    };
+    router.refresh();
+    Ok(())
+}
+
+/// Test the built-in Aegis Cloud provider by sending a minimal ping.
+#[tauri::command]
+pub async fn aegis_cloud_test(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<()> {
+    let providers = {
+        let s = state.lock();
+        let __moved = (*s.providers.lock()).clone();
+        __moved
+    };
+    let provider = providers.get("aegis-cloud").ok_or_else(|| {
+        AegisError::AiNotConfigured("aegis-cloud provider not registered".into())
+    })?;
+    provider.ping().await
+}
+
+/// Return the list of all available tool specs (sent to the AI on each call).
+#[tauri::command]
+pub fn agent_list_tools() -> serde_json::Value {
+    crate::ai::tools::specs_as_json()
 }
 
 // Silence unused warnings for re-exported types used only in command signatures.
