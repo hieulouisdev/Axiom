@@ -114,6 +114,18 @@ pub async fn ai_chat(
         ),
     );
 
+    // v0.5: Retrieval-augmented generation — inject up to 5 stored facts
+    // whose embeddings are most similar to the user's latest message.
+    // No-op if the knowledge base is empty.
+    {
+        let s = state.lock();
+        let _ = crate::memory::rag::inject_default(
+            &mut messages,
+            &params.user_message,
+            &s.memory.embeddings,
+        );
+    }
+
     let req = ChatRequest {
         messages,
         model: params.model,
@@ -220,6 +232,16 @@ pub async fn ai_chat_stream(
         "You are Aegis AI, a secure cross-platform assistant. \
          Be concise, accurate, and refuse any request that would harm the user's system."
     ));
+
+    // v0.5: RAG — inject relevant stored facts into the system message.
+    {
+        let s = state.lock();
+        let _ = crate::memory::rag::inject_default(
+            &mut messages,
+            &params.user_message,
+            &s.memory.embeddings,
+        );
+    }
 
     // Generate stream ID and create cancel token
     let stream_id = uuid::Uuid::new_v4().simple().to_string();
@@ -1316,6 +1338,134 @@ pub fn skills_set(id: String) -> Result<()> {
     std::fs::write(&path, &id)
         .map_err(|e| AegisError::Io(format!("failed to write active_skill: {e}")))?;
     Ok(())
+}
+
+// ===========================================================================
+// v0.5 — Voice I/O (STT / TTS / Push-to-talk)
+// ===========================================================================
+
+/// Transcribe an audio blob via the configured STT backend.
+///
+/// The frontend should send raw bytes captured from the microphone plus a
+/// MIME type (`audio/wav`, `audio/mpeg`, `audio/webm`, …). The command
+/// returns a [`Transcript`] which includes the recognized text, the wake
+/// word detection flag, and the backend name.
+#[tauri::command]
+pub async fn voice_transcribe(
+    audio_b64: String,
+    mime: String,
+) -> Result<crate::voice::Transcript> {
+    use base64::Engine as _;
+    let audio = base64::engine::general_purpose::STANDARD
+        .decode(audio_b64.as_bytes())
+        .map_err(|e| AegisError::Internal(format!("base64 decode failed: {e}")))?;
+    let stt = crate::voice::stt::default_stt();
+    stt.transcribe(&audio, &mime).await
+}
+
+/// Synthesize speech from text. Writes the resulting audio file to a temp
+/// path (or `opts.out_path` if provided) and returns the file path + MIME.
+///
+/// The frontend can play the result with `<audio src="file://…">`.
+#[tauri::command]
+pub async fn voice_speak(
+    text: String,
+    opts: Option<crate::voice::TtsOptions>,
+) -> Result<serde_json::Value> {
+    let opts = opts.unwrap_or_default();
+    let tts = crate::voice::tts::default_tts();
+    let speech = tts.synthesize(&text, &opts).await?;
+    Ok(serde_json::to_value(&speech)?)
+}
+
+/// Return the current push-to-talk hotkey state.
+#[tauri::command]
+pub fn voice_ptt_state(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> serde_json::Value {
+    let s = state.lock();
+    serde_json::json!({
+        "state": match s.hotkey.state() {
+            crate::voice::PushToTalkState::Idle => "idle",
+            crate::voice::PushToTalkState::Recording => "recording",
+        },
+        "hotkey": s.hotkey.hotkey(),
+        "registered": s.hotkey.is_registered(),
+    })
+}
+
+/// Update the push-to-talk hotkey. Re-registers the global shortcut.
+#[tauri::command]
+pub fn voice_ptt_set_hotkey(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    app: tauri::AppHandle,
+    hotkey: String,
+) -> Result<serde_json::Value> {
+    // Parse the new hotkey before clearing the old one so we surface a
+    // config error to the frontend without losing the existing registration.
+    let _shortcut: tauri_plugin_global_shortcut::Shortcut = hotkey
+        .parse()
+        .map_err(|e| AegisError::Config(format!("invalid hotkey '{hotkey}': {e}")))?;
+    let s = state.lock();
+    if let Err(e) = crate::voice::hotkey::unregister(&app, &s.hotkey) {
+        tracing::warn!("failed to unregister previous PTT hotkey: {e}");
+    }
+    s.hotkey.set_hotkey(&hotkey);
+    crate::voice::hotkey::register(&app, &s.hotkey)?;
+    Ok(serde_json::json!({
+        "hotkey": hotkey,
+        "registered": s.hotkey.is_registered(),
+    }))
+}
+
+// ===========================================================================
+// v0.5 — Calendar (CalDAV)
+// ===========================================================================
+
+/// Returns today's calendar events. Empty vec if no CalDAV server configured.
+#[tauri::command]
+pub async fn calendar_list_today(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<Vec<crate::calendar::CalendarEvent>> {
+    let client = {
+        let s = state.lock();
+        s.calendar.lock().clone()
+    };
+    client.today().await
+}
+
+/// Configure the CalDAV server connection. Stored in `config.toml`.
+#[tauri::command]
+pub fn calendar_configure(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    cfg: crate::calendar::CalendarConfig,
+) -> Result<()> {
+    let new_client = crate::calendar::CalendarClient::new(cfg.clone())?;
+    {
+        let s = state.lock();
+        *s.calendar.lock() = new_client;
+    }
+    tracing::info!(
+        "calendar configured: url={} user={}",
+        cfg.url,
+        cfg.username
+    );
+    Ok(())
+}
+
+/// Classify a natural-language message and dispatch it as a calendar intent.
+/// For list-style intents, fetches events from CalDAV. For schedule_meeting,
+/// fetches today's events so the AI can detect conflicts.
+#[tauri::command]
+pub async fn calendar_dispatch_intent(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    message: String,
+) -> Result<crate::calendar::CalendarDispatchResult> {
+    let client = {
+        let s = state.lock();
+        s.calendar.lock().clone()
+    };
+    crate::calendar::dispatch_calendar_intent(&message, &client).await
 }
 
 // Silence unused warnings for re-exported types used only in command signatures.

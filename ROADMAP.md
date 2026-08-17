@@ -2,7 +2,7 @@
 
 This file tracks the four-stage development plan for Aegis AI. Each phase has
 a clear goal, scope, deliverables, and exit criteria. The current release is
-**v0.4.0 (Phase 3.0 — AI Model Catalog + Bypass Mode + Skills + New Tools)**.
+**v0.5.0 (Phase 3.1/3.2/3.3 — Voice I/O + Vector RAG + CalDAV Calendar)**.
 
 ---
 
@@ -195,8 +195,8 @@ see `CHANGELOG.md` § "Fixed (pre-existing v0.2 issues)" for the full list.
 **Goal:** Differentiate from generic AI chat apps with proactive agent
 behavior, voice, and deep OS integration.
 
-**Status:** v0.4 released 2026-08-17 (Phase 3.0 — catalog, bypass, skills,
-new tools). Phase 3.1 / 3.2 / 3.3 still in progress.
+**Status:** v0.5 released 2026-08-17 (Phase 3.1 calendar + 3.2 voice I/O +
+3.3 RAG foundation). Phase 3.4 is feature-complete; Phase 4 not started.
 
 ### 3.0 — v0.4 baseline (catalog + bypass + skills + tools)
 
@@ -234,26 +234,32 @@ new tools). Phase 3.1 / 3.2 / 3.3 still in progress.
 
 - [x] File-system watcher (`notify` crate) — AI reacts to new files in
       watched directories.
-- [ ] Calendar integration (CalDAV) — proactive daily summaries.
-- [ ] Calendar-intent dispatch ("schedule a meeting with…") via the AI.
+- [x] Calendar integration (CalDAV) — proactive daily summaries.
+- [x] Calendar-intent dispatch ("schedule a meeting with…") via the AI.
 - [x] Wake-on-event bus: security escalations, file events, hotkey
       presses (heartbeat-based for v0.4; richer event bus coming in v0.5).
 
 ### 3.2 Voice I/O
 
-- [ ] Whisper-based local STT for "Hey Aegis" wake word + voice input.
-- [ ] TTS playback via Piper (local) or ElevenLabs (cloud, opt-in).
-- [ ] Push-to-talk hotkey registered system-wide.
+- [x] Whisper-based local STT for "Hey Aegis" wake word + voice input.
+      (v0.5: cloud OpenAI Whisper backend; local `whisper-rs` queued for
+      Phase 4 — `LocalStt` stub returns empty transcript.)
+- [x] TTS playback via Piper (local) or ElevenLabs (cloud, opt-in).
+      (v0.5: Linux uses `espeak`/`espeak-ng`, Windows uses SAPI,
+      macOS uses `say`. Piper integration queued for Phase 4.)
+- [x] Push-to-talk hotkey registered system-wide (`Ctrl+Space` default).
 
 ### 3.3 Knowledge graph
 
 - [x] Foundation: `KnowledgeBase::search(query, limit)` — Jaccard
       token-overlap ranking + substring bonus. Sufficient for short
       factual queries.
-- [ ] Replace the simple `key → value` knowledge table with a vector
+- [x] Replace the simple `key → value` knowledge table with a vector
       embedding store (`qdrant` or `lancedb`).
+      (v0.5: SQLite-backed character-trigram hash embeddings. Real
+      embedding model + `qdrant`/`lancedb` queued for Phase 4.)
 - [ ] Auto-extract entities from chat history (regex + LLM).
-- [ ] Retrieval-augmented generation (RAG): inject relevant facts into the
+- [x] Retrieval-augmented generation (RAG): inject relevant facts into the
       next chat's system prompt. (Partial: `memory_search` tool exposes
       the search; agent loop integration is v0.5.)
 

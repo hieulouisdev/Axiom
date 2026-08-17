@@ -1,6 +1,6 @@
 {
   "name": "aegis-ai",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Aegis AI — secure, cross-platform AI assistant with computer-use, memory, and auto-defense.",
   "type": "module",
   "license": "MIT",

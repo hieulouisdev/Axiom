@@ -705,7 +705,10 @@ fn run_memory_remember(
         Some(s) => s.to_string(),
         None => return json!({"error":"missing 'value' argument"}).to_string(),
     };
-    match memory.knowledge.remember(&key, &value, Some("agent"), 0.8) {
+    // v0.5: route through MemoryStore::remember so the embedding is updated
+    // in lockstep with the knowledge table — RAG retrieval always sees the
+    // latest facts.
+    match memory.remember(&key, &value, Some("agent"), 0.8) {
         Ok(_) => json!({"ok": true, "key": key}).to_string(),
         Err(e) => error_json("memory_remember", &e),
     }

@@ -8,9 +8,11 @@ use tauri::AppHandle;
 
 use crate::{
     ai::{provider::ProviderRegistry as AiProviderRegistry, router::AiRouter},
+    calendar::{CalendarClient, CalendarConfig},
     config::{AppConfig, ConfigStore},
     memory::store::MemoryStore,
     security::quarantine::QuarantineStore,
+    voice::HotkeyManager,
 };
 
 /// Top-level container holding live handles to every backend subsystem.
@@ -46,6 +48,12 @@ pub struct AppState {
 
     /// File quarantine store (lifted from defender task to AppState in Phase 2).
     pub quarantine: Mutex<QuarantineStore>,
+
+    /// v0.5: Push-to-talk hotkey manager (Ctrl+Space by default).
+    pub hotkey: Arc<HotkeyManager>,
+
+    /// v0.5: CalDAV calendar client. Cheap to clone; safe to share.
+    pub calendar: Mutex<CalendarClient>,
 }
 
 impl AppState {
@@ -65,6 +73,16 @@ impl AppState {
             MemoryStore::open_in_memory().expect("in-memory sqlite should always open")
         });
 
+        // v0.5: bootstrap the calendar client. We use a default (no-op)
+        // config if the user hasn't configured one yet — they can wire it
+        // up via the Settings UI at runtime.
+        let calendar_cfg = CalendarConfig::default();
+        let calendar = CalendarClient::new(calendar_cfg).unwrap_or_else(|e| {
+            tracing::warn!("failed to init calendar client: {e}; using no-op default");
+            CalendarClient::new(CalendarConfig::default())
+                .expect("default calendar config should always construct")
+        });
+
         Arc::new(Mutex::new(AppState {
             config,
             providers: Mutex::new(providers),
@@ -74,6 +92,8 @@ impl AppState {
             cancel_tokens: Mutex::new(HashMap::new()),
             pending_actions: Mutex::new(HashMap::new()),
             quarantine: Mutex::new(QuarantineStore::new()),
+            hotkey: Arc::new(HotkeyManager::new()),
+            calendar: Mutex::new(calendar),
         }))
     }
 
@@ -105,6 +125,18 @@ impl AppState {
                 *mem_arc = memory;
             } else {
                 tracing::warn!("could not swap memory store — keeping in-memory");
+            }
+        }
+
+        // v0.5: backfill vector embeddings for any knowledge entries that
+        // predate the embeddings table (i.e. v0.4 facts that haven't been
+        // re-embedded yet). Best-effort; logged but not fatal.
+        {
+            let s = state.lock();
+            match s.memory.embeddings.backfill() {
+                Ok(n) if n > 0 => tracing::info!("backfilled {n} knowledge embeddings"),
+                Ok(_) => {}
+                Err(e) => tracing::warn!("backfill embeddings failed: {e}"),
             }
         }
 
@@ -161,6 +193,16 @@ impl AppState {
                     let conn = conn.lock();
                     let _ = crate::security::integrity::save_baselines_to_db(&conn);
                 }
+            }
+        }
+
+        // v0.5: Register the push-to-talk hotkey (best-effort; the plugin
+        // can fail on platforms without accessibility permission, e.g.
+        // a fresh Linux box without X11 shortcut support).
+        {
+            let s = state.lock();
+            if let Err(e) = crate::voice::hotkey::register(app, &s.hotkey) {
+                tracing::warn!("push-to-talk hotkey registration failed: {e}");
             }
         }
 

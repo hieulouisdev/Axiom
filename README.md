@@ -5,16 +5,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.97.1-orange.svg)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-orange.svg)](https://tauri.app)
-[![Phase](https://img.shields.io/badge/Phase-3.0%20(v0.4)-green.svg)](ROADMAP.md)
+[![Phase](https://img.shields.io/badge/Phase-3.3%20(v0.5)-green.svg)](ROADMAP.md)
 
-> **Current release:** v0.4 — Phase 3 begins. Adds a unified AI model
-> catalog (10,978 models across 119 providers), 60 new OpenAI-compatible
-> providers, a user-controlled **Bypass Mode** (the AI does what it wants,
-> except for an irrevocable hard-deny list), 15 builtin **skills** (code
-> writer, code reviewer, debugger, architect, security auditor, …), and
-> **14 new tools** (git_op, regex_search, diff_apply, code_eval,
-> process_list, http_fetch, …). See the [Roadmap](ROADMAP.md) and
-> [Changelog](CHANGELOG.md) for details.
+> **Current release:** v0.5 — Phase 3 continues. Adds **Voice I/O** (cloud
+> Whisper STT + OS-native TTS + Ctrl+Space push-to-talk hotkey), **Vector-
+> embedding RAG** (every chat now pulls the top-5 most similar stored facts
+> into the system prompt automatically), and **CalDAV calendar integration**
+> (read-only Nextcloud/Radicale/Synology client + intent classifier for
+> "what's on my calendar today?" / "schedule a meeting with…"). See the
+> [Roadmap](ROADMAP.md) and [Changelog](CHANGELOG.md) for details.
 
 ## What is Aegis AI?
 
@@ -40,6 +39,20 @@ automation, clipboard, memory, git, process, code_eval, http_fetch,
 notify, open_url, skill switching) via OpenAI-style function-calling,
 while every action flows through the safety policy.
 
+New in v0.5: the AI's chat replies are now grounded in your stored facts
+via **vector-embedding RAG**. Whenever you send a message, Aegis searches
+the knowledge base for the top-5 most similar entries (character-trigram
+hash embeddings, cosine similarity ≥ 0.30) and prepends them to the system
+prompt — so asking "what's my dog's name?" just works if you've ever told
+the AI your dog's name. You can also **talk to Aegis**: press `Ctrl+Space`
+to toggle push-to-talk, the frontend captures audio and ships it to the
+`voice_transcribe` Tauri command (cloud OpenAI Whisper if you've set an
+API key, otherwise a no-op stub). Replies can be **spoken aloud** via
+`voice_speak` (Linux uses `espeak`/`espeak-ng`, Windows uses SAPI, macOS
+uses `say`; optional ElevenLabs cloud TTS). And if you connect a CalDAV
+server (Nextcloud, Radicale, Synology, …), asking "what's on my calendar
+today?" surfaces today's VEVENTs directly.
+
 New in v0.4: the user can enable **Bypass Mode** — when on, the AI skips
 safety confirmations for medium- and high-risk actions (so it can write
 code into your project folders, run shell pipelines, delete files, etc.
@@ -47,7 +60,7 @@ without prompting on every step), EXCEPT for an irrevocable hard-deny list
 (rm -rf /, mkfs, dd to device, sudo to root, credential dumpers, reverse
 shells, kernel modules). The audit log still records every action.
 
-Also new: **Skills** — pick from 15 builtin specializations (code writer,
+Also new in v0.4: **Skills** — pick from 15 builtin specializations (code writer,
 code reviewer, refactorer, test writer, doc writer, git helper, sysadmin,
 researcher, data analyst, translator, summarizer, email drafter, debugger,
 architect, security auditor) and the AI's persona + preferred tools change

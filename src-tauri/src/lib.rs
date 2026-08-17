@@ -1,12 +1,13 @@
 //! Aegis AI — Secure cross-platform AI assistant library.
 //!
 //! This crate provides the full backend for the Aegis AI desktop application:
-//! - Multi-provider AI routing (20+ providers)
+//! - Multi-provider AI routing (90+ providers)
 //! - Streaming chat over Tauri events
 //! - Computer-use agent with real GUI automation (enigo)
 //! - Screenshot capture + OCR
 //! - OS keychain credential storage
 //! - Persistent memory store (SQLite)
+//! - Vector-embedding RAG (v0.5)
 //! - Security monitor with auto-defense
 //! - File integrity monitoring
 //! - Network anomaly detection
@@ -15,9 +16,12 @@
 //! - File system watcher for proactive AI
 //! - Clipboard monitoring
 //! - System tray integration
+//! - Voice I/O: STT (cloud Whisper), TTS (OS-native + ElevenLabs), PTT (v0.5)
+//! - CalDAV calendar integration + intent dispatch (v0.5)
 //! - Bilingual UI (English default, Vietnamese)
 
 pub mod ai;
+pub mod calendar;
 pub mod commands;
 pub mod computer;
 pub mod config;
@@ -27,6 +31,7 @@ pub mod memory;
 pub mod modes;
 pub mod security;
 pub mod state;
+pub mod voice;
 
 use std::sync::Arc;
 
@@ -151,6 +156,15 @@ pub fn run() {
             commands::skills_list,
             commands::skills_active,
             commands::skills_set,
+            // ===== v0.5 — Voice I/O =====
+            commands::voice_transcribe,
+            commands::voice_speak,
+            commands::voice_ptt_state,
+            commands::voice_ptt_set_hotkey,
+            // ===== v0.5 — Calendar (CalDAV) =====
+            commands::calendar_list_today,
+            commands::calendar_configure,
+            commands::calendar_dispatch_intent,
             // ===== Computer use =====
             commands::computer_exec_command,
             commands::computer_open_app,

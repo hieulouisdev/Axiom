@@ -1,5 +1,5 @@
 //! SQLite-backed memory store: opens the DB, runs migrations, exposes
-//! per-domain stores (conversations / activities / knowledge).
+//! per-domain stores (conversations / activities / knowledge / embeddings).
 
 use std::path::Path;
 use std::sync::Arc;
@@ -11,6 +11,7 @@ use crate::error::Result;
 
 use super::activity::ActivityLog;
 use super::conversation::ConversationStore;
+use super::embeddings::EmbeddingStore;
 use super::knowledge::KnowledgeBase;
 
 /// Type alias for the shared connection used by all sub-stores.
@@ -21,6 +22,8 @@ pub struct MemoryStore {
     pub conversations: ConversationStore,
     pub activity: ActivityLog,
     pub knowledge: KnowledgeBase,
+    /// v0.5: vector embeddings for RAG.
+    pub embeddings: EmbeddingStore,
 }
 
 impl MemoryStore {
@@ -44,6 +47,7 @@ impl MemoryStore {
             conversations: ConversationStore::new(conn.clone()),
             activity: ActivityLog::new(conn.clone()),
             knowledge: KnowledgeBase::new(conn.clone()),
+            embeddings: EmbeddingStore::new(conn.clone()),
             conn,
         }
     }
@@ -114,6 +118,9 @@ impl MemoryStore {
         // v0.3: audit log table — every AI tool call is recorded here.
         crate::computer::audit::migrate(&conn)?;
 
+        // v0.5: knowledge_embeddings table for vector RAG.
+        crate::memory::embeddings::migrate(&conn)?;
+
         Ok(())
     }
 
@@ -121,5 +128,28 @@ impl MemoryStore {
     /// that want to perform transactional work outside the sub-stores.
     pub fn shared_conn(&self) -> SharedConn {
         self.conn.clone()
+    }
+
+    /// v0.5: high-level "remember a fact" that updates BOTH the knowledge
+    /// table and its embedding in one call. Callers should prefer this over
+    /// `knowledge.remember()` so RAG retrieval always sees the latest facts.
+    pub fn remember(
+        &self,
+        key: &str,
+        value: &str,
+        source: Option<&str>,
+        confidence: f64,
+    ) -> Result<()> {
+        self.knowledge.remember(key, value, source, confidence)?;
+        let text = format!("{key} {value}");
+        self.embeddings.upsert(key, &text)?;
+        Ok(())
+    }
+
+    /// v0.5: forget a fact + drop its embedding.
+    pub fn forget(&self, key: &str) -> Result<()> {
+        self.knowledge.forget(key)?;
+        self.embeddings.delete(key)?;
+        Ok(())
     }
 }

@@ -240,6 +240,19 @@ async fn agent_loop_inner(
     );
     messages.insert(0, ChatMessage::system(system_prompt));
 
+    // v0.5: Retrieval-augmented generation — inject up to 5 stored facts
+    // whose embeddings are most similar to the user's latest message. This
+    // gives the agent grounded context for memory_search before any tool
+    // call is made. No-op if the knowledge base is empty.
+    {
+        let memory = state.lock();
+        let _ = crate::memory::rag::inject_default(
+            &mut messages,
+            &params.user_message,
+            &memory.memory.embeddings,
+        );
+    }
+
     let tool_specs: Vec<ToolSpec> = tools::all_specs();
     let tools_json = tools::specs_as_json();
 

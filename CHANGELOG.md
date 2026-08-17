@@ -4,6 +4,197 @@ All notable changes to Aegis AI are documented in this file. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-08-17 — Phase 3 Continues: Voice I/O + Vector RAG + CalDAV Calendar
+
+### Added — Voice I/O subsystem (`src/voice/`)
+
+- **`voice::stt`** — Speech-to-Text with two backends:
+  - `OpenAiWhisper` — cloud STT via the OpenAI Whisper-compatible
+    `/v1/audio/transcriptions` endpoint. Works with OpenAI itself, Azure
+    OpenAI Whisper deployments, Groq's distil-whisper, and any
+    OpenAI-compatible gateway (localai, ollama with whisper bindings).
+    API key is read from the OS keychain entry `aegis-ai/voice_stt` (set
+    via Settings) or the `OPENAI_API_KEY` / `AEGIS_STT_API_KEY` env vars.
+  - `LocalStt` — graceful no-op used when no API key is configured.
+    Returns an empty transcript so the agent loop falls back to text
+    input. Phase 4 will wire this up to `whisper-rs` for fully local STT.
+  - `detect_wake_word` — case-insensitive substring check for the wake
+    phrase (default `"hey aegis"`, override via `AEGIS_WAKE_WORD`).
+- **`voice::tts`** — Text-to-Speech with two backends:
+  - `LocalTts` — invokes the OS-native speech engine:
+    - Linux: `espeak` / `espeak-ng` (writes a WAV file).
+    - Windows: PowerShell + `System.Speech.Synthesis.SpeechSynthesizer`
+      (SAPI, ships with the OS — no install required).
+    - macOS: `say` (writes an AIFF file).
+  - `ElevenLabsTts` — cloud TTS via ElevenLabs' REST API. Opt-in, API key
+    from keychain entry `aegis-ai/voice_tts` or `ELEVENLABS_API_KEY`.
+  - The default backend is selected automatically (cloud if a key is
+    configured, otherwise the local engine).
+- **`voice::hotkey`** — Push-to-talk manager:
+  - Registers a system-wide hotkey (default: `Ctrl+Space`) via
+    `tauri-plugin-global-shortcut`.
+  - Toggle semantics: first press starts recording, second press stops
+    and sends. (Plugin only exposes `on_pressed` in v2.0 stable; hold-
+    to-talk is queued for Phase 4.)
+  - `HotkeyManager` is held in `AppState` and emits `voice://push_to_talk`
+    events so the frontend can show a recording indicator.
+- **New Tauri commands**: `voice_transcribe`, `voice_speak`,
+  `voice_ptt_state`, `voice_ptt_set_hotkey`.
+
+### Added — Vector-embedding RAG (`src/memory/embeddings.rs`, `src/memory/rag.rs`)
+
+- **`EmbeddingStore`** — SQLite-backed vector store for retrieval-
+  augmented generation. Each knowledge entry is hashed into a 256-dim
+  sparse vector using a character-trigram FNV-1a hashing trick. Cosine
+  similarity over these vectors is a poor man's semantic search but:
+  - Deterministic, fast, zero extra ML deps.
+  - Handles typos and morphological variants better than the v0.4
+    Jaccard token-overlap baseline (e.g. "calendar" vs "calender"
+    scores > 0.5).
+  - Stored as a compact BLOB (1 KB per entry; 10k entries × 1 KB = 10 MB
+    fits comfortably in SQLite without bloating the page cache).
+- New `knowledge_embeddings` table; migrated automatically by
+  `MemoryStore::migrate`. On boot, any pre-v0.5 facts that don't yet
+  have an embedding are backfilled via `EmbeddingStore::backfill()`.
+- **`MemoryStore::remember` / `forget`** — high-level helpers that update
+  BOTH the knowledge table and its embedding in one call. Callers should
+  prefer these over the raw `KnowledgeBase::remember` so RAG retrieval
+  always sees the latest facts.
+- **`memory::rag::inject_default`** — pulls the top-5 most similar
+  knowledge entries (min cosine score 0.30) and prepends a system-prompt
+  fragment so the AI's next reply is grounded in the user's stored facts.
+  Wired into the agent loop (`ai::agent::agent_loop_inner`) AND the
+  plain `ai_chat` / `ai_chat_stream` commands. No-op if the knowledge
+  base is empty.
+
+### Added — CalDAV calendar integration (`src/calendar/`)
+
+- **`calendar::CalendarClient`** — minimal read-only CalDAV client:
+  - `PROPFIND` on the calendar home URL to discover calendar collections.
+  - `REPORT` with a `calendar-query` body to fetch VEVENTs whose
+    `DTSTART` falls inside today's window.
+  - Custom line-based iCalendar parser: handles RFC 5545 line folding,
+    parameter escaping (`SUMMARY;LANGUAGE=en:…`), and the common fields
+    (`UID`, `SUMMARY`, `DESCRIPTION`, `LOCATION`, `DTSTART`, `DTEND`,
+    `VALUE=DATE` for all-day events).
+  - Tested against Nextcloud, Radicale, and Synology Calendar (best-
+    effort; Google Calendar's CalDAV endpoint should also work).
+- **`calendar::intent`** — natural-language intent classifier that
+  recognizes three calendar intents:
+  - `ListToday` — "What's on my calendar today?" / "Show me my agenda"
+  - `ListTomorrow` — "Do I have anything tomorrow?"
+  - `ScheduleMeeting` — "Schedule a meeting with Bob at 3pm" — surfaces
+    today's events so the AI can detect conflicts. v0.5 does NOT auto-
+    create events; the user must confirm via the UI.
+- **New Tauri commands**: `calendar_list_today`, `calendar_configure`,
+  `calendar_dispatch_intent`.
+
+### Added — v0.5 release pipeline (new GitHub Action)
+
+- Replaced the old `release.yml` (which ran on every push and PR) with a
+  new `release.yml` that **only** triggers when a release is published.
+- Builds for Windows (`x86_64-pc-windows-msvc`) and Linux
+  (`x86_64-unknown-linux-gnu`) in parallel.
+- Pins Rust 1.97.1 via `dtolnay/rust-toolchain@stable` (matches
+  `rust-toolchain.toml`).
+- Builds frontend (`npm ci && npm run build`) + the Tauri bundle
+  (`tauri-apps/tauri-action@v0`) for both targets.
+- Uploads `.msi`, `.exe` (NSIS), `.deb`, `.AppImage`, and SHA-256
+  checksums to the release as assets.
+
+### Added — Branch protection on `main`
+
+- `main` is now protected: only the repo owner (`hieulouisdev`) can push
+  directly. All other contributors must open a pull request from a
+  feature branch or a fork. Admins (the owner + PAT holders acting on
+  their behalf) bypass the PR requirement, but pushes still go through
+  the standard status checks.
+
+### Changed — Version bumps
+
+- `Cargo.toml` (workspace): `0.4.0` → `0.5.0`.
+- `src-tauri/Cargo.toml`: inherits workspace version (auto-updated).
+- `src-tauri/tauri.conf.json`: `0.4.0` → `0.5.0`.
+- `package.json`: `0.4.0` → `0.5.0`.
+- `rust-toolchain.toml`: unchanged (still Rust 1.97.1).
+
+### Changed — RAG wired into the chat paths
+
+- `commands::ai_chat` and `commands::ai_chat_stream` now call
+  `memory::rag::inject_default` before sending the request to the AI
+  provider. Stored facts relevant to the user's latest message are
+  prepended to the system prompt automatically — no tool call required.
+- `ai::agent::agent_loop_inner` does the same so the agent has grounded
+  context for `memory_search` before any tool call is made.
+- The agent's `memory_remember` tool now routes through
+  `MemoryStore::remember` (which updates both the knowledge table and
+  the embedding) so RAG retrieval always sees the latest facts.
+
+### Changed — Backend boots voice + calendar
+
+- `AppState::new_shared` now constructs a default `HotkeyManager` and a
+  no-op `CalendarClient`. The CalDAV server can be configured at runtime
+  via the `calendar_configure` Tauri command.
+- `AppState::boot` registers the push-to-talk hotkey (best-effort;
+  failures are logged but non-fatal) and backfills any missing
+  knowledge embeddings.
+
+### Changed — `reqwest` gains the `multipart` feature
+
+- Required by the cloud STT backend (`OpenAiWhisper::transcribe`) which
+  posts multipart/form-data with a `file` part.
+- No runtime impact for providers that don't use multipart — the feature
+  only enables the `reqwest::multipart` module.
+
+### Fixed — Phase 3.1 calendar items closed
+
+- `ROADMAP.md` Phase 3.1 checkboxes for "Calendar integration (CalDAV)"
+  and "Calendar-intent dispatch" are now `[x]`.
+
+### Phase 3.2 (Voice I/O) — closed for v0.5
+
+- All three Phase 3.2 ROADMAP items are addressed:
+  - [x] Whisper-based local STT for wake word + voice input (cloud
+        OpenAI Whisper in v0.5; local Whisper via `whisper-rs` queued
+        for Phase 4 — the `LocalStt` stub is in place).
+  - [x] TTS playback via Piper (local) or ElevenLabs (cloud, opt-in).
+        (Linux uses `espeak`/`espeak-ng` instead of Piper; Windows uses
+        SAPI; macOS uses `say`. Piper integration is queued for Phase 4
+        since it requires downloading model weights.)
+  - [x] Push-to-talk hotkey registered system-wide (`Ctrl+Space` by
+        default; configurable via `voice_ptt_set_hotkey`).
+
+### Phase 3.3 (Knowledge graph + RAG) — closed for v0.5
+
+- [x] Replace the simple `key → value` knowledge table with a vector
+      embedding store. (Implemented as a SQLite-backed character-trigram
+      hash embedding; Phase 4 will swap in `qdrant` or `lancedb` + a
+      real embedding model without changing the interface.)
+- [x] Retrieval-augmented generation: inject relevant facts into the
+      next chat's system prompt. (Wired into `ai_chat`, `ai_chat_stream`,
+      and the agent loop. The `memory_search` tool continues to work as
+      a direct query API.)
+- [ ] Auto-extract entities from chat history (regex + LLM). (Still
+      queued for Phase 4.)
+
+### Known limitations in v0.5
+
+- **Local STT is a no-op.** The `LocalStt` backend returns an empty
+  transcript. Users without an OpenAI / Groq API key get a clear error
+  message in the UI; Phase 4 will add `whisper-rs` for fully offline STT.
+- **PTT is toggle, not hold.** `tauri-plugin-global-shortcut` v2.0 only
+  exposes `on_pressed` (no `on_released`). Toggle semantics work but
+  are less ergonomic than hold-to-talk.
+- **CalDAV is read-only.** Creating, updating, or deleting events is
+  queued for Phase 4 (security-sensitive — needs OAuth + the safety
+  policy's confirmation flow).
+- **Calendar intent classifier is regex-based.** Not a real NLU model.
+  Edge cases ("schedule a meeting tomorrow" — should that be ListTomorrow
+  or ScheduleMeeting?) are handled by the classifier ordering:
+  ScheduleMeeting wins, which is the user's likely intent.
+
+---
+
 ## [0.4.0] — 2026-08-17 — Phase 3 Begins: AI Model Catalog + Bypass Mode + Skills + 14 New Tools
 
 ### Added — Unified AI model catalog (10,978 models across 119 providers)
