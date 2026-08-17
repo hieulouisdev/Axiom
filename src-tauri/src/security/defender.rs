@@ -169,13 +169,14 @@ fn process_binary_path(pid: u32) -> Option<String> {
             let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
             let mut buf = [0u16; 1024];
             let mut len = buf.len() as u32;
-            // `PROCESS_NAME_FORMAT` is `#[repr(transparent)]` over `i32` with
-            // two associated constants. `ProcessNameFormatWin32Exe` (= 0)
-            // returns the full path of the executable image.
-            let format = PROCESS_NAME_FORMAT::ProcessNameFormatWin32Exe;
+            // `PROCESS_NAME_FORMAT` in windows 0.58 is a `#[repr(transparent)]
+            // pub struct PROCESS_NAME_FORMAT(pub i32);` — the named constants
+            // `PROCESS_NAME_FORMAT_WIN32_EXE` (= 0) were added as top-level
+            // consts only in newer versions. Construct directly with the
+            // tuple-struct form: 0 = Win32Exe (full image path).
             let ok = QueryFullProcessImageNameW(
                 h,
-                format,
+                PROCESS_NAME_FORMAT(0),
                 windows::core::PWSTR(buf.as_mut_ptr()),
                 &mut len,
             ).is_ok();
