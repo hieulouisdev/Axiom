@@ -162,16 +162,20 @@ fn process_binary_path(pid: u32) -> Option<String> {
     {
         use windows::Win32::Foundation::CloseHandle;
         use windows::Win32::System::Threading::{
-            OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT_WIN32_EXE,
+            OpenProcess, PROCESS_NAME_FORMAT, QueryFullProcessImageNameW,
             PROCESS_QUERY_LIMITED_INFORMATION,
         };
         unsafe {
             let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
             let mut buf = [0u16; 1024];
             let mut len = buf.len() as u32;
+            // `PROCESS_NAME_FORMAT` is `#[repr(transparent)]` over `i32` with
+            // two associated constants. `ProcessNameFormatWin32Exe` (= 0)
+            // returns the full path of the executable image.
+            let format = PROCESS_NAME_FORMAT::ProcessNameFormatWin32Exe;
             let ok = QueryFullProcessImageNameW(
                 h,
-                PROCESS_NAME_FORMAT_WIN32_EXE,
+                format,
                 windows::core::PWSTR(buf.as_mut_ptr()),
                 &mut len,
             ).is_ok();
