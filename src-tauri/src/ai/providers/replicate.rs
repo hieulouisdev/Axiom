@@ -9,11 +9,11 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::json;
 
-use crate::error::{AegisError, Result};
 use crate::ai::provider::{
-    ChatMessage, ChatRequest, ChatResponse, Provider,
-    ProviderCategory, ProviderCreds, ProviderDescriptor, Role, Usage,
+    ChatMessage, ChatRequest, ChatResponse, Provider, ProviderCategory, ProviderCreds,
+    ProviderDescriptor, Role,
 };
+use crate::error::{AegisError, Result};
 
 const REPLICATE_API_BASE: &str = "https://api.replicate.com/v1";
 
@@ -79,7 +79,8 @@ impl ReplicateProvider {
             "input": input,
         });
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .bearer_auth(api_key)
             .json(&body)
@@ -95,7 +96,8 @@ impl ReplicateProvider {
         }
 
         let resp_body: serde_json::Value = resp.json().await?;
-        let prediction_id = resp_body["id"].as_str()
+        let prediction_id = resp_body["id"]
+            .as_str()
             .ok_or_else(|| AegisError::Ai("no prediction id in response".into()))?;
 
         Ok(prediction_id.to_string())
@@ -111,11 +113,7 @@ impl ReplicateProvider {
         let max_attempts = 120; // 120 * 2s = 4 minutes max wait
 
         for _ in 0..max_attempts {
-            let resp = self.client
-                .get(&url)
-                .bearer_auth(api_key)
-                .send()
-                .await?;
+            let resp = self.client.get(&url).bearer_auth(api_key).send().await?;
 
             if !resp.status().is_success() {
                 let status = resp.status();
@@ -161,12 +159,14 @@ impl Provider for ReplicateProvider {
 
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {
         let creds = self.creds();
-        let api_key = creds.api_key.clone()
-            .ok_or_else(|| AegisError::AiNotConfigured(
-                "replicate requires an API key".into()
-            ))?;
+        let api_key = creds
+            .api_key
+            .clone()
+            .ok_or_else(|| AegisError::AiNotConfigured("replicate requires an API key".into()))?;
 
-        let model = req.model.clone()
+        let model = req
+            .model
+            .clone()
             .or(creds.model.clone())
             .unwrap_or_else(|| self.descriptor.default_model.clone());
 
@@ -196,19 +196,27 @@ impl Provider for ReplicateProvider {
         }
 
         // If the last message is from user, use it as the prompt
-        let prompt = req.messages.iter()
+        let prompt = req
+            .messages
+            .iter()
             .rev()
             .find(|m| m.role == Role::User)
             .map(|m| m.content.clone())
             .unwrap_or(conversation);
 
         // Create prediction
-        let prediction_id = self.create_prediction(
-            &model,
-            &prompt,
-            &api_key,
-            if system_prompt.is_empty() { None } else { Some(&system_prompt) },
-        ).await?;
+        let prediction_id = self
+            .create_prediction(
+                &model,
+                &prompt,
+                &api_key,
+                if system_prompt.is_empty() {
+                    None
+                } else {
+                    Some(&system_prompt)
+                },
+            )
+            .await?;
 
         // Poll for result
         let result = self.poll_prediction(&prediction_id, &api_key).await?;
@@ -235,12 +243,13 @@ impl Provider for ReplicateProvider {
     async fn ping(&self) -> Result<()> {
         // Simple test: verify the API key works by checking account
         let creds = self.creds();
-        let api_key = creds.api_key.clone()
-            .ok_or_else(|| AegisError::AiNotConfigured(
-                "replicate requires an API key".into()
-            ))?;
+        let api_key = creds
+            .api_key
+            .clone()
+            .ok_or_else(|| AegisError::AiNotConfigured("replicate requires an API key".into()))?;
 
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{REPLICATE_API_BASE}/predictions?limit=1"))
             .bearer_auth(&api_key)
             .send()

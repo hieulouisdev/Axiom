@@ -55,6 +55,7 @@ hex = { workspace = true }
 
 # Config
 directories = { workspace = true }
+dirs = { workspace = true }
 toml = { workspace = true }
 
 # Misc

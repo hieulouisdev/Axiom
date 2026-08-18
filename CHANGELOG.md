@@ -2,6 +2,141 @@
 
 All notable changes to Aegis AI. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0] — 2026-08-19 — General-Availability Release
+
+This is the first stable, production-tagged release of Aegis AI. Every
+public surface (Rust backend, TypeScript frontend, GitHub Actions pipeline,
+documentation) has been audited and fixed in a single comprehensive sweep.
+
+### Fixed — Rust backend
+
+- **`tauri.conf.json` schema** — the `bundle.plugins.updater` block was at
+  the wrong nesting level (Tauri 2.6+ rejects unknown fields at the bundle
+  root). Updater config moved to a top-level `plugins.updater` block so
+  `tauri::generate_context!()` no longer panics at build time.
+- **`commands.rs` `SharedState` import** — the v0.7 sandbox & telemetry
+  command handlers referenced `SharedState` without importing it, causing
+  7 hard compile errors. Added `use crate::SharedState;` to the import
+  block.
+- **`commands.rs` `Result<T, String>` conflict** — the workspace's
+  `crate::error::Result<T>` type alias only takes one generic argument,
+  so the sandbox & telemetry commands' `Result<X, String>` signatures
+  failed to compile. Switched to `std::result::Result<X, String>` for
+  those seven handlers.
+- **`security/sandbox.rs` missing `dirs` crate** — three call-sites used
+  `dirs::home_dir()` but the `dirs` crate was not declared in
+  `Cargo.toml`. Added `dirs = "5.0"` to the workspace dependencies.
+- **`openai_compat.rs` `maybe_api_key` returned the API key even for
+  providers that don't require one** — the `if/else` branches were
+  identical (`self.creds().api_key.clone()` in both arms). Now returns
+  `None` when `requires_api_key` is false, so local providers (Ollama,
+  LM Studio, …) no longer leak stored credentials to the bearer-auth
+  header.
+- **`voice/tts.rs` had three identical branches** for Linux, Windows,
+  and "default" — all produced `.wav` files. macOS produces AIFF, the
+  others produce WAV. Collapsed the redundant branches into a single
+  `if cfg!(target_os = "macos") { "aiff" } else { "wav" }` lookup.
+- **`apply_diff_minimal` was a stub** — the function counted hunks but
+  never applied them, leaving the patched file unchanged. Replaced with
+  a real unified-diff applier that handles `@@ -a,b +c,d @@` hunk
+  headers, context lines, +/- adds and removes, and `\ No newline at
+  end of file` markers.
+- **`run_code_eval` ignored its `timeout_seconds` argument** — AI-
+  generated code could hang the agent indefinitely. Added
+  `run_with_timeout()` that spawns the interpreter and kills it after
+  the deadline, returning `ErrorKind::TimedOut`.
+- **`extract_heuristic` regex used `(?i)` over the whole pattern** —
+  this made the `[A-Z]` anchor in the capture group match lowercase
+  letters too, so "my name is Louis and I live in Hanoi" captured
+  "Louis and" instead of "Louis". Switched to `(?i:prefix)` so only
+  the keyword is case-insensitive; the capture stays case-sensitive.
+- **`calendar/caldav.rs::unfold_lines` stripped the leading whitespace**
+  from continuation lines, corrupting any iCal value that contained a
+  space at the fold point (`SUMMARY:Hello\r\n World` became
+  `SUMMARY:HelloWorld` instead of `SUMMARY:Hello World`). Now keeps a
+  single separator space at the fold point, matching what producers
+  actually wrote.
+- **`memory/embeddings.rs` only used character trigrams** — RAG queries
+  like "what is my dog's name?" failed to retrieve the stored fact
+  "pet_name Rex dog" because the cosine similarity (0.23) was below
+  the 0.30 threshold. Added word-unigram features (only for multi-word
+  inputs, so single-word typo tolerance is preserved) so semantic
+  matches cross the threshold.
+- **`memory/entities.rs` compiled a regex in a tight loop** — the
+  `favorite (\w+) is` pattern was being re-compiled on every outer
+  capture. Lifted to a single compile outside the loop.
+- **`ai/agent.rs` used `.min().max()` instead of `.clamp()`** —
+  replaced with `clamp(1, ABSOLUTE_MAX_ITERATIONS)` for clarity.
+- **`ai/providers/bedrock.rs` had an unused `client: Client` field**
+  on `BedrockProvider` (the SigV4 signing path is stubbed out). Removed
+  the field and its construction.
+- **`security/network.rs::parse_addr` was flagged dead code** — the
+  function is only called from `#[cfg(windows)]`. Added the same
+  cfg-gate to the function definition.
+- **`commands.rs::CsvWriter::to_string` shadowed the `ToString` trait
+  method** — replaced with a `Display` impl so callers can use
+  `format!("{wtr}")` or `wtr.to_string()` interchangeably.
+- **`computer/safety.rs::expand_tilde` stripped a prefix manually** —
+  replaced `p.starts_with("~/")` + `&p[2..]` with `strip_prefix("~/")`.
+- **`calendar/caldav.rs::ymd_hms_to_unix` indexed `mdays` with a
+  loop counter** — replaced `for m in 0..n { mdays[m] }` with
+  `for (m, &dm) in mdays.iter().enumerate().take(n)`.
+- **30+ unused imports / dead variables** — cleaned up across all
+  modules so `cargo clippy --all-targets -- -D warnings` passes clean.
+
+### Fixed — GitHub Actions
+
+- **`build-release.yml` & `release.yml` referenced wrong target
+  directory** — the workspace `Cargo.toml` is at the repo root, so
+  build artifacts end up under `target/<target>/release/bundle/`, not
+  `src-tauri/target/...`. The checksums step looked in the wrong path
+  and silently produced zero checksum files. Both workflows now walk
+  both paths defensively.
+- **`continue-on-error: true` on `cargo fmt` and `cargo clippy` steps
+  let lint regressions merge silently** — both are now hard gates that
+  fail the build. Added a separate `lint-and-test` job that runs fmt,
+  clippy, and `cargo test --lib` before any binary is built.
+- **`release.yml` cache key included `src-tauri/target` and `target`
+  but the cache restore-keys list was missing `cargo-release-${label}-`**
+  — fixed so warm caches actually hit.
+- **Build summary referenced `src-tauri/target/`** in its `find`
+  invocation — updated to walk both `target/` and `src-tauri/target/`.
+
+### Fixed — Frontend
+
+- **`Sidebar.tsx` showed a stale version string ("0.8.0")** as fallback
+  when the backend wasn't reachable — updated to `1.0.0` to match the
+  `Cargo.toml` workspace version.
+- **`Settings.tsx` had an unused `Loader` import shadowed by `Loader2`**
+  — TypeScript still compiled because of `noUnusedLocals: false`, but
+  the runtime was carrying dead code. Removed.
+- **`tsconfig.json` `noUnusedLocals` / `noUnusedParameters` were both
+  off** — left as-is for now (turning them on would be a breaking
+  change for the inline-style `theme` variable in `Web.tsx`), but the
+  unused imports that *were* there have been removed.
+
+### Changed
+
+- **Version bumped to 1.0.0** across `Cargo.toml`, `package.json`,
+  `src-tauri/tauri.conf.json`, `Sidebar.tsx` fallback, and README badge.
+- **Rust toolchain pinned to 1.97.1** — verified by `rustc --version`
+  and the `rust-toolchain.toml` file.
+- **`tauri.conf.json`** — updater `pubkey` left empty (signing keys are
+  a v1.1 deliverable; the updater plugin degrades gracefully without
+  one).
+
+### Verified
+
+- `cargo check --manifest-path src-tauri/Cargo.toml` — passes (0 errors).
+- `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --
+  -D warnings` — passes (0 warnings, 0 errors).
+- `cargo test --manifest-path src-tauri/Cargo.toml --lib` — passes
+  (104 tests, 0 failures).
+- `cargo fmt --all -- --check` (in `src-tauri/`) — passes.
+- `npm run build` (Vite frontend) — passes; produces `dist/` with
+  index.html, CSS, and JS bundle.
+- `npx tsc --noEmit` — passes (0 TypeScript errors).
+
 ## [0.9.0] — 2026-08-19 — Documentation & Polish
 
 ### Changed

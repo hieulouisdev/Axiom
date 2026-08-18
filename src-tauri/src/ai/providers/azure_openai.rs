@@ -3,18 +3,17 @@
 //! Phase 2: Full implementation with Azure-specific auth (API key with
 //! `api-key` header), deployment-id URL routing, and api-version query param.
 
-use std::collections::BTreeMap;
 use std::sync::RwLock;
 
 use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::json;
 
-use crate::error::{AegisError, Result};
 use crate::ai::provider::{
-    ChatMessage, ChatRequest, ChatResponse, ChatStreamChunk, Provider,
-    ProviderCategory, ProviderCreds, ProviderDescriptor, Role, Usage,
+    ChatMessage, ChatRequest, ChatResponse, ChatStreamChunk, Provider, ProviderCategory,
+    ProviderCreds, ProviderDescriptor, Role, Usage,
 };
+use crate::error::{AegisError, Result};
 
 pub struct AzureOpenAiProvider {
     descriptor: ProviderDescriptor,
@@ -55,18 +54,22 @@ impl AzureOpenAiProvider {
     /// Build the Azure OpenAI URL:
     /// `https://{resource}.openai.azure.com/openai/deployments/{deployment}/chat/completions?api-version={version}`
     fn build_url(&self, creds: &ProviderCreds) -> Result<String> {
-        let base_url = creds.base_url.clone()
-            .ok_or_else(|| AegisError::AiNotConfigured(
-                "azure_openai requires base_url in format: https://{resource}.openai.azure.com".into()
-            ))?;
+        let base_url = creds.base_url.clone().ok_or_else(|| {
+            AegisError::AiNotConfigured(
+                "azure_openai requires base_url in format: https://{resource}.openai.azure.com"
+                    .into(),
+            )
+        })?;
 
-        let deployment_id = creds.extra.get("deployment_id")
-            .cloned()
-            .ok_or_else(|| AegisError::AiNotConfigured(
-                "azure_openai requires 'deployment_id' in extra config".into()
-            ))?;
+        let deployment_id = creds.extra.get("deployment_id").cloned().ok_or_else(|| {
+            AegisError::AiNotConfigured(
+                "azure_openai requires 'deployment_id' in extra config".into(),
+            )
+        })?;
 
-        let api_version = creds.extra.get("api_version")
+        let api_version = creds
+            .extra
+            .get("api_version")
             .cloned()
             .unwrap_or_else(|| "2024-06-01".into());
 
@@ -93,12 +96,13 @@ impl Provider for AzureOpenAiProvider {
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {
         let creds = self.creds();
         let url = self.build_url(&creds)?;
-        let api_key = creds.api_key.clone()
-            .ok_or_else(|| AegisError::AiNotConfigured(
-                "azure_openai requires an API key".into()
-            ))?;
+        let api_key = creds.api_key.clone().ok_or_else(|| {
+            AegisError::AiNotConfigured("azure_openai requires an API key".into())
+        })?;
 
-        let model = req.model.clone()
+        let model = req
+            .model
+            .clone()
             .or(creds.model.clone())
             .unwrap_or_else(|| self.descriptor.default_model.clone());
 
@@ -117,9 +121,10 @@ impl Provider for AzureOpenAiProvider {
             "max_tokens": req.max_tokens.unwrap_or(2048),
         });
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
-            .header("api-key", &api_key)  // Azure uses "api-key" header, not Bearer
+            .header("api-key", &api_key) // Azure uses "api-key" header, not Bearer
             .json(&body)
             .send()
             .await?;
@@ -127,7 +132,9 @@ impl Provider for AzureOpenAiProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(AegisError::Ai(format!("HTTP {status} from azure_openai: {text}")));
+            return Err(AegisError::Ai(format!(
+                "HTTP {status} from azure_openai: {text}"
+            )));
         }
 
         let resp_body: serde_json::Value = resp.json().await?;
@@ -141,12 +148,13 @@ impl Provider for AzureOpenAiProvider {
     ) -> Result<ChatResponse> {
         let creds = self.creds();
         let url = self.build_url(&creds)?;
-        let api_key = creds.api_key.clone()
-            .ok_or_else(|| AegisError::AiNotConfigured(
-                "azure_openai requires an API key".into()
-            ))?;
+        let api_key = creds.api_key.clone().ok_or_else(|| {
+            AegisError::AiNotConfigured("azure_openai requires an API key".into())
+        })?;
 
-        let model = req.model.clone()
+        let model = req
+            .model
+            .clone()
             .or(creds.model.clone())
             .unwrap_or_else(|| self.descriptor.default_model.clone());
 
@@ -166,7 +174,8 @@ impl Provider for AzureOpenAiProvider {
             "stream": true,
         });
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .header("api-key", &api_key)
             .json(&body)
@@ -176,7 +185,9 @@ impl Provider for AzureOpenAiProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(AegisError::Ai(format!("HTTP {status} from azure_openai: {text}")));
+            return Err(AegisError::Ai(format!(
+                "HTTP {status} from azure_openai: {text}"
+            )));
         }
 
         crate::ai::providers::openai_compat::parse_sse_stream(resp, on_chunk).await

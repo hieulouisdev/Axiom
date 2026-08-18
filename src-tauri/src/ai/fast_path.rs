@@ -170,11 +170,13 @@ pub fn chat_cache_key(provider_id: &str, req: &crate::ai::provider::ChatRequest)
         h.update(m.content.as_bytes());
         h.update(b"\x1e");
     }
-    h.update(format!(
-        "t={:?}|m={:?}|p={:?}",
-        req.temperature, req.max_tokens, req.top_p
-    )
-    .as_bytes());
+    h.update(
+        format!(
+            "t={:?}|m={:?}|p={:?}",
+            req.temperature, req.max_tokens, req.top_p
+        )
+        .as_bytes(),
+    );
     let digest = h.finalize();
     format!("chat-{}", hex::encode(&digest[..16]))
 }

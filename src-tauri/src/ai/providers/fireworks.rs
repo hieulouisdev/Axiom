@@ -18,7 +18,10 @@ impl FireworksProvider {
             false,
             Some("https://api.fireworks.ai/inference/v1"),
             "accounts/fireworks/models/llama-v3p3-70b-instruct",
-            &["accounts/fireworks/models/llama-v3p3-70b-instruct", "accounts/fireworks/models/qwen2p5-72b-instruct"],
+            &[
+                "accounts/fireworks/models/llama-v3p3-70b-instruct",
+                "accounts/fireworks/models/qwen2p5-72b-instruct",
+            ],
             true,
         ))
     }

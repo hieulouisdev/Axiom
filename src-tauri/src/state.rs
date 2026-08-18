@@ -11,11 +11,7 @@ use crate::{
     calendar::{CalendarClient, CalendarConfig},
     config::{AppConfig, ConfigStore},
     memory::store::MemoryStore,
-    security::{
-        quarantine::QuarantineStore,
-        sandbox::SandboxPolicy,
-        telemetry::TelemetryConfig,
-    },
+    security::{quarantine::QuarantineStore, sandbox::SandboxPolicy, telemetry::TelemetryConfig},
     voice::HotkeyManager,
 };
 
@@ -185,9 +181,7 @@ impl AppState {
         if cfg.security.monitor {
             let state_for_monitor = state.clone();
             tokio::spawn(async move {
-                if let Err(e) =
-                    crate::security::monitor::start(state_for_monitor).await
-                {
+                if let Err(e) = crate::security::monitor::start(state_for_monitor).await {
                     tracing::error!("security monitor exited with error: {e:#}");
                 }
             });
@@ -197,9 +191,7 @@ impl AppState {
         if cfg.security.auto_defense {
             let state_for_defense = state.clone();
             tokio::spawn(async move {
-                if let Err(e) =
-                    crate::security::defender::start(state_for_defense).await
-                {
+                if let Err(e) = crate::security::defender::start(state_for_defense).await {
                     tracing::error!("auto-defense watcher exited with error: {e:#}");
                 }
             });

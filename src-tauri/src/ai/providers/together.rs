@@ -18,7 +18,11 @@ impl TogetherProvider {
             false,
             Some("https://api.together.xyz/v1"),
             "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-            &["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-72B-Instruct-Turbo", "deepseek-ai/DeepSeek-R1"],
+            &[
+                "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                "Qwen/Qwen2.5-72B-Instruct-Turbo",
+                "deepseek-ai/DeepSeek-R1",
+            ],
             true,
         ))
     }

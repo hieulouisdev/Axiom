@@ -130,7 +130,8 @@ impl AegisCloudProvider {
             return Ok(k);
         }
         // Last-resort lookup: env var (in case set_creds was called with None).
-        let from_env = std::env::var(ENV_KEY_PRIMARY).ok()
+        let from_env = std::env::var(ENV_KEY_PRIMARY)
+            .ok()
             .or_else(|| std::env::var(ENV_KEY_ALIAS).ok());
         from_env
             .ok_or_else(|| AegisError::AiNotConfigured(
@@ -261,8 +262,7 @@ impl Provider for AegisCloudProvider {
     ) -> Result<ChatResponse> {
         let resp = self.do_chat(&req, true).await?;
         // Reuse the shared OpenAI-compat SSE parser from `openai_compat`.
-        let parsed =
-            crate::ai::providers::openai_compat::parse_sse_stream(resp, on_chunk).await?;
+        let parsed = crate::ai::providers::openai_compat::parse_sse_stream(resp, on_chunk).await?;
         Ok(parsed)
     }
 

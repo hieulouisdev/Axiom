@@ -18,7 +18,12 @@ impl MistralProvider {
             false,
             Some("https://api.mistral.ai/v1"),
             "mistral-small-latest",
-            &["mistral-large-latest", "mistral-small-latest", "codestral-latest", "pixtral-12b-2409"],
+            &[
+                "mistral-large-latest",
+                "mistral-small-latest",
+                "codestral-latest",
+                "pixtral-12b-2409",
+            ],
             true,
         ))
     }

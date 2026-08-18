@@ -18,7 +18,10 @@ impl HuggingFaceProvider {
             false,
             Some("https://api-inference.huggingface.co/v1"),
             "meta-llama/Llama-3.3-70B-Instruct",
-            &["meta-llama/Llama-3.3-70B-Instruct", "mistralai/Mistral-7B-Instruct-v0.3"],
+            &[
+                "meta-llama/Llama-3.3-70B-Instruct",
+                "mistralai/Mistral-7B-Instruct-v0.3",
+            ],
             true,
         ))
     }

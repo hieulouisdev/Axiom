@@ -98,15 +98,12 @@ pub fn web_search_sync(query: &str) -> Vec<SearchResult> {
 fn extract_ddg_results(html: &str) -> Vec<SearchResult> {
     let mut out: Vec<SearchResult> = Vec::new();
     // Anchor titles: <a class="result__a" ...>title text</a>
-    let title_re = regex::Regex::new(
-        r#"<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#,
-    )
-    .expect("title regex is valid");
+    let title_re =
+        regex::Regex::new(r#"<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#)
+            .expect("title regex is valid");
 
-    let snippet_re = regex::Regex::new(
-        r#"<a[^>]*class="result__snippet"[^>]*>(.*?)</a>"#,
-    )
-    .expect("snippet regex is valid");
+    let snippet_re = regex::Regex::new(r#"<a[^>]*class="result__snippet"[^>]*>(.*?)</a>"#)
+        .expect("snippet regex is valid");
 
     // Walk the HTML in chunks split on "result__url" so we get one entry per result.
     for block in html.split("result__body") {
@@ -233,7 +230,9 @@ pub async fn fetch_readable(url: &str) -> Result<String> {
 /// Synchronous wrapper for `fetch_readable` — used by the agent tool dispatcher.
 pub fn fetch_readable_sync(url: &str) -> String {
     match tokio::runtime::Handle::try_current() {
-        Ok(h) => h.block_on(fetch_readable(url)).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}")),
+        Ok(h) => h
+            .block_on(fetch_readable(url))
+            .unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}")),
         Err(_) => {
             let rt = match tokio::runtime::Runtime::new() {
                 Ok(r) => r,
@@ -251,12 +250,30 @@ pub fn fetch_readable_sync(url: &str) -> String {
 pub fn extract_readable(html: &str) -> String {
     let lower = html.to_lowercase();
     let skip_openings: &[&str] = &[
-        "<script", "<style", "<nav", "<header", "<footer", "<aside",
-        "<form", "<noscript", "<svg", "<iframe", "<button",
+        "<script",
+        "<style",
+        "<nav",
+        "<header",
+        "<footer",
+        "<aside",
+        "<form",
+        "<noscript",
+        "<svg",
+        "<iframe",
+        "<button",
     ];
     let skip_closings: &[&str] = &[
-        "</script>", "</style>", "</nav>", "</header>", "</footer>", "</aside>",
-        "</form>", "</noscript>", "</svg>", "</iframe>", "</button>",
+        "</script>",
+        "</style>",
+        "</nav>",
+        "</header>",
+        "</footer>",
+        "</aside>",
+        "</form>",
+        "</noscript>",
+        "</svg>",
+        "</iframe>",
+        "</button>",
     ];
 
     let mut buf = String::with_capacity(html.len());

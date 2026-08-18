@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::Result;
 
 /// Alert configuration for webhook/email notifications.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AlertConfig {
     /// Webhook URL to POST alerts to (e.g. Slack, Discord, custom endpoint).
     pub webhook_url: Option<String>,
@@ -13,20 +13,8 @@ pub struct AlertConfig {
     pub email_to: Option<String>,
 }
 
-impl Default for AlertConfig {
-    fn default() -> Self {
-        Self {
-            webhook_url: None,
-            email_to: None,
-        }
-    }
-}
-
 /// Send an alert for a defense event.
-pub async fn send_alert(
-    event: &super::defender::DefenseEvent,
-    config: &AlertConfig,
-) -> Result<()> {
+pub async fn send_alert(event: &super::defender::DefenseEvent, config: &AlertConfig) -> Result<()> {
     // Send webhook if configured
     if let Some(webhook_url) = &config.webhook_url {
         send_webhook(event, webhook_url).await?;
@@ -34,17 +22,17 @@ pub async fn send_alert(
 
     // Email alerts are logged but not implemented (would need SMTP config)
     if let Some(email) = &config.email_to {
-        tracing::info!("alert email would be sent to: {} (SMTP not yet configured)", email);
+        tracing::info!(
+            "alert email would be sent to: {} (SMTP not yet configured)",
+            email
+        );
     }
 
     Ok(())
 }
 
 /// POST the event payload to the configured webhook URL.
-async fn send_webhook(
-    event: &super::defender::DefenseEvent,
-    webhook_url: &str,
-) -> Result<()> {
+async fn send_webhook(event: &super::defender::DefenseEvent, webhook_url: &str) -> Result<()> {
     let client = reqwest::Client::new();
     let payload = serde_json::json!({
         "source": "aegis-ai",

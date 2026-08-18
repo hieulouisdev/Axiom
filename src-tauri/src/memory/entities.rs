@@ -118,7 +118,11 @@ pub fn extract_and_store(store: &MemoryStore, messages: &[String]) -> Result<usi
         .into_iter()
         .filter(|e| {
             let key = format!("{}:{}", e.kind, e.value);
-            store.knowledge.lookup(&key).map(|o| o.is_none()).unwrap_or(true)
+            store
+                .knowledge
+                .lookup(&key)
+                .map(|o| o.is_none())
+                .unwrap_or(true)
         })
         .collect();
     persist_entities(store, &new_entities)
@@ -201,36 +205,41 @@ fn heuristic_patterns() -> &'static Vec<(Regex, &'static str)> {
     static P: OnceLock<Vec<(Regex, &'static str)>> = OnceLock::new();
     P.get_or_init(|| {
         vec![
+            // Note: `(?i:...)` makes only the *keyword* prefix case-insensitive.
+            // The capture group stays case-sensitive so that "my name is Louis
+            // and I live in Hanoi" captures "Louis" (not "Louis and") — the
+            // trailing optional word must start with a *real* uppercase letter
+            // to be considered part of a proper name.
             (
-                Regex::new(r"(?i)\b(?:my name is|i'm called|call me)\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+)?)").unwrap(),
+                Regex::new(r"\b(?i:my name is|i'm called|call me)\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+)?)").unwrap(),
                 "name",
             ),
             (
-                Regex::new(r"(?i)\b(?:i live in|i'm based in|i'm from|my location is)\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+)?(?:,\s*[A-Z][a-zA-Z'-]+)?)").unwrap(),
+                Regex::new(r"\b(?i:i live in|i'm based in|i'm from|my location is)\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+)?(?:,\s*[A-Z][a-zA-Z'-]+)?)").unwrap(),
                 "location",
             ),
             (
-                Regex::new(r"(?i)\b(?:my (?:pet|dog|cat) (?:is called|is named|name is))\s+([A-Z][a-zA-Z'-]+)").unwrap(),
+                Regex::new(r"\b(?i:my (?:pet|dog|cat) (?:is called|is named|name is))\s+([A-Z][a-zA-Z'-]+)").unwrap(),
                 "pet_name",
             ),
             (
-                Regex::new(r"(?i)\b(?:i work at|i'm a software engineer at|i'm an engineer at|i'm a developer at)\s+([A-Z][a-zA-Z0-9&' -]+)").unwrap(),
+                Regex::new(r"\b(?i:i work at|i'm a software engineer at|i'm an engineer at|i'm a developer at)\s+([A-Z][a-zA-Z0-9&' -]+)").unwrap(),
                 "employer",
             ),
             (
-                Regex::new(r"(?i)\b(?:my (?:favourite|favorite) (\w+) is)\s+([A-Z][a-zA-Z'-]+)").unwrap(),
+                Regex::new(r"\b(?i:my (?:favourite|favorite) (\w+) is)\s+([A-Z][a-zA-Z'-]+)").unwrap(),
                 "favorite",
             ),
             (
-                Regex::new(r"(?i)\b(?:remember that|note that|keep in mind that)\s+(.+)").unwrap(),
+                Regex::new(r"\b(?i:remember that|note that|keep in mind that)\s+(.+)").unwrap(),
                 "note",
             ),
             (
-                Regex::new(r"(?i)\b(?:my timezone is|i'm in the)\s+([A-Z][a-zA-Z/]+(?:[+-]\d+)?\s*timezone?)").unwrap(),
+                Regex::new(r"\b(?i:my timezone is|i'm in the)\s+([A-Z][a-zA-Z/]+(?:[+-]\d+)?\s*timezone?)").unwrap(),
                 "timezone",
             ),
             (
-                Regex::new(r"(?i)\b(?:i'm (?:a |an )?)([a-z][a-z\s]+)(?:\b by trade|\b by profession)").unwrap(),
+                Regex::new(r"\b(?i:i'm (?:a |an ))([a-z][a-z\s]+)(?:\b by trade|\b by profession)").unwrap(),
                 "profession",
             ),
         ]
@@ -239,10 +248,18 @@ fn heuristic_patterns() -> &'static Vec<(Regex, &'static str)> {
 
 fn extract_heuristic(msg: &str) -> Vec<(String, String, f64)> {
     let mut out = Vec::new();
+    // Compile the inner "favorite (\w+) is" pattern once and reuse it across
+    // all outer captures — compiling regexes inside a tight loop is wasteful
+    // and clippy rightly flags it.
+    let favorite_re = Regex::new(r"(?i)favorite (\w+) is").ok();
     for (re, kind) in heuristic_patterns() {
         for cap in re.captures_iter(msg) {
             if let Some(m) = cap.get(1) {
-                let value = m.as_str().trim().trim_end_matches(['.', ',', '!', '?']).to_string();
+                let value = m
+                    .as_str()
+                    .trim()
+                    .trim_end_matches(['.', ',', '!', '?'])
+                    .to_string();
                 if value.len() < 2 || value.len() > 100 {
                     continue;
                 }
@@ -250,8 +267,8 @@ fn extract_heuristic(msg: &str) -> Vec<(String, String, f64)> {
                     // For "my favorite X is Y", we capture both X and Y.
                     let x = cap.get(0).map(|m| m.as_str()).unwrap_or("");
                     // Heuristic: extract the noun after "favorite"
-                    if let Some(noun) = Regex::new(r"(?i)favorite (\w+) is")
-                        .ok()
+                    if let Some(noun) = favorite_re
+                        .as_ref()
                         .and_then(|r| r.captures(x))
                         .and_then(|c| c.get(1))
                     {
@@ -286,21 +303,27 @@ mod tests {
     fn extracts_email() {
         let msgs = vec!["Contact me at alice@example.com please".into()];
         let e = extract_from_messages(&msgs);
-        assert!(e.iter().any(|x| x.kind == "email" && x.value == "alice@example.com"));
+        assert!(e
+            .iter()
+            .any(|x| x.kind == "email" && x.value == "alice@example.com"));
     }
 
     #[test]
     fn extracts_url() {
         let msgs = vec!["Check https://rust-lang.org/ for docs".into()];
         let e = extract_from_messages(&msgs);
-        assert!(e.iter().any(|x| x.kind == "url" && x.value == "https://rust-lang.org/"));
+        assert!(e
+            .iter()
+            .any(|x| x.kind == "url" && x.value == "https://rust-lang.org/"));
     }
 
     #[test]
     fn extracts_github_repo() {
         let msgs = vec!["PR is at https://github.com/hieulouisdev/Axiom".into()];
         let e = extract_from_messages(&msgs);
-        assert!(e.iter().any(|x| x.kind == "github_repo" && x.value == "hieulouisdev/Axiom"));
+        assert!(e
+            .iter()
+            .any(|x| x.kind == "github_repo" && x.value == "hieulouisdev/Axiom"));
     }
 
     #[test]
@@ -308,7 +331,9 @@ mod tests {
         let msgs = vec!["Hi, my name is Louis and I live in Hanoi".into()];
         let e = extract_from_messages(&msgs);
         assert!(e.iter().any(|x| x.kind == "name" && x.value == "Louis"));
-        assert!(e.iter().any(|x| x.kind == "location" && x.value.contains("Hanoi")));
+        assert!(e
+            .iter()
+            .any(|x| x.kind == "location" && x.value.contains("Hanoi")));
     }
 
     #[test]
@@ -333,22 +358,24 @@ mod tests {
     fn extracts_phone_international() {
         let msgs = vec!["Call me at +1 (415) 555-2671".into()];
         let e = extract_from_messages(&msgs);
-        assert!(e.iter().any(|x| x.kind == "phone" && x.value.contains("+1")));
+        assert!(e
+            .iter()
+            .any(|x| x.kind == "phone" && x.value.contains("+1")));
     }
 
     #[test]
     fn extracts_iso_date() {
         let msgs = vec!["Let's meet on 2026-09-15".into()];
         let e = extract_from_messages(&msgs);
-        assert!(e.iter().any(|x| x.kind == "date" && x.value == "2026-09-15"));
+        assert!(e
+            .iter()
+            .any(|x| x.kind == "date" && x.value == "2026-09-15"));
     }
 
     #[test]
     fn extracts_and_stores_in_memory() {
         let store = MemoryStore::open_in_memory().unwrap();
-        let msgs = vec![
-            "Hi, my name is Alice, email alice@example.com".into(),
-        ];
+        let msgs = vec!["Hi, my name is Alice, email alice@example.com".into()];
         let n = extract_and_store(&store, &msgs).unwrap();
         assert!(n >= 2);
         // Second run should not re-store (dedup via lookup).

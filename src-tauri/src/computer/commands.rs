@@ -57,7 +57,10 @@ fn run_command(command: &str) -> Result<ExecResult> {
 
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-    let exit_code = output.status.code().unwrap_or(if is_unix { 143 } else { 1 });
+    let exit_code = output
+        .status
+        .code()
+        .unwrap_or(if is_unix { 143 } else { 1 });
 
     Ok(ExecResult {
         command: command.to_string(),

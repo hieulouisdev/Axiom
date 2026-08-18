@@ -4,23 +4,20 @@
 //! Uses the Anthropic Messages API format for Claude models,
 //! and OpenAI-compat format for other models.
 
-use std::collections::BTreeMap;
 use std::sync::RwLock;
 
 use async_trait::async_trait;
-use reqwest::Client;
 use serde_json::json;
 
-use crate::error::{AegisError, Result};
 use crate::ai::provider::{
-    ChatMessage, ChatRequest, ChatResponse, ChatStreamChunk, Provider,
-    ProviderCategory, ProviderCreds, ProviderDescriptor, Role, Usage,
+    ChatMessage, ChatRequest, ChatResponse, Provider, ProviderCategory, ProviderCreds,
+    ProviderDescriptor, Role, Usage,
 };
+use crate::error::{AegisError, Result};
 
 pub struct BedrockProvider {
     descriptor: ProviderDescriptor,
     creds: RwLock<ProviderCreds>,
-    client: Client,
 }
 
 impl BedrockProvider {
@@ -43,14 +40,9 @@ impl BedrockProvider {
             ],
             implemented: true,
         };
-        let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(120))
-            .build()
-            .expect("reqwest client");
         std::sync::Arc::new(Self {
             descriptor: desc,
             creds: RwLock::new(ProviderCreds::default()),
-            client,
         })
     }
 
@@ -61,7 +53,9 @@ impl BedrockProvider {
     /// Build the Bedrock invoke URL:
     /// `https://bedrock-runtime.{region}.amazonaws.com/model/{model_id}/invoke`
     fn build_url(&self, creds: &ProviderCreds, model: &str) -> String {
-        let region = creds.extra.get("region")
+        let region = creds
+            .extra
+            .get("region")
             .cloned()
             .unwrap_or_else(|| "us-east-1".into());
 
@@ -72,7 +66,7 @@ impl BedrockProvider {
     }
 
     /// Build the Anthropic-style request body for Claude models.
-    fn build_anthropic_body(&self, req: &ChatRequest, model: &str) -> serde_json::Value {
+    fn build_anthropic_body(&self, req: &ChatRequest, _model: &str) -> serde_json::Value {
         // Separate system messages from user/assistant messages
         let mut system_parts = Vec::new();
         let mut messages = Vec::new();
@@ -127,9 +121,9 @@ impl BedrockProvider {
         _creds: &ProviderCreds,
     ) -> Result<reqwest::RequestBuilder> {
         Err(AegisError::Ai(
-            "AWS Bedrock signing is not implemented in v0.3 — the aws-sigv4 crate \
+            "AWS Bedrock signing is not implemented in v1.0 — the aws-sigv4 crate \
              version resolved by Cargo.lock (1.5.1) differs from the version this \
-             code was written against (1.2). See ROADMAP §2.4 for the v0.4 plan."
+             code was written against (1.2). See ROADMAP §2.4 for the v1.1 plan."
                 .into(),
         ))
     }
@@ -147,14 +141,16 @@ impl Provider for BedrockProvider {
 
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {
         let creds = self.creds();
-        let model = req.model.clone()
+        let model = req
+            .model
+            .clone()
             .or(creds.model.clone())
             .unwrap_or_else(|| self.descriptor.default_model.clone());
 
         let url = self.build_url(&creds, &model);
         let body = self.build_anthropic_body(&req, &model);
-        let body_bytes = serde_json::to_vec(&body)
-            .map_err(|e| AegisError::Ai(format!("serialize: {e}")))?;
+        let body_bytes =
+            serde_json::to_vec(&body).map_err(|e| AegisError::Ai(format!("serialize: {e}")))?;
 
         let signed_req = self.sign_request("POST", &url, &body_bytes, &creds)?;
         let resp = signed_req.send().await?;
@@ -162,7 +158,9 @@ impl Provider for BedrockProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(AegisError::Ai(format!("HTTP {status} from bedrock: {text}")));
+            return Err(AegisError::Ai(format!(
+                "HTTP {status} from bedrock: {text}"
+            )));
         }
 
         let resp_body: serde_json::Value = resp.json().await?;
@@ -191,14 +189,14 @@ fn parse_bedrock_response(body: &serde_json::Value, model: &str) -> Result<ChatR
         .unwrap_or("")
         .to_string();
 
-    let usage = body.get("usage").and_then(|u| {
+    let usage = body.get("usage").map(|u| {
         let input = u["inputTokens"].as_u64().unwrap_or(0) as u32;
         let output = u["outputTokens"].as_u64().unwrap_or(0) as u32;
-        Some(Usage {
+        Usage {
             prompt_tokens: input,
             completion_tokens: output,
             total_tokens: input + output,
-        })
+        }
     });
 
     Ok(ChatResponse {

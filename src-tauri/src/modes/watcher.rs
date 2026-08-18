@@ -4,7 +4,6 @@
 //! that the AI can analyze proactively.
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -54,14 +53,11 @@ pub fn recent_events() -> Vec<WatchEvent> {
 
 /// Start watching directories for changes.
 /// This spawns a background task that uses the `notify` crate.
-pub async fn start_watching(
-    config: WatchConfig,
-    app_handle: tauri::AppHandle,
-) -> Result<()> {
+pub async fn start_watching(config: WatchConfig, app_handle: tauri::AppHandle) -> Result<()> {
     // v0.3: notify 6.1.1 requires the `Watcher` trait import to call
     // `watcher.watch(...)` and the `EventHandler` trait to pass an mpsc::Sender
     // directly to `Watcher::new`. We use the callback-based API instead.
-    use notify::{RecommendedWatcher, RecursiveMode, Event, EventKind, Watcher};
+    use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
     use std::sync::mpsc;
 
     if config.watch_paths.is_empty() {
@@ -72,10 +68,11 @@ pub async fn start_watching(
     // Build a watcher that funnels events into an mpsc channel via a closure.
     let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
 
-    let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
-        let _ = tx.send(res);
-    })
-    .map_err(|e| crate::error::AegisError::Internal(format!("watcher init: {e}")))?;
+    let mut watcher: RecommendedWatcher =
+        notify::recommended_watcher(move |res: notify::Result<Event>| {
+            let _ = tx.send(res);
+        })
+        .map_err(|e| crate::error::AegisError::Internal(format!("watcher init: {e}")))?;
 
     for path in &config.watch_paths {
         let p = PathBuf::from(path);
@@ -110,7 +107,8 @@ pub async fn start_watching(
                         let watch_event = WatchEvent {
                             kind: kind_str.to_string(),
                             path: path.to_string_lossy().to_string(),
-                            timestamp_ms: time::OffsetDateTime::now_utc().unix_timestamp() as u64 * 1000,
+                            timestamp_ms: time::OffsetDateTime::now_utc().unix_timestamp() as u64
+                                * 1000,
                         };
 
                         // Store recent events

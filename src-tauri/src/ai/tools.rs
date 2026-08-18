@@ -45,16 +45,14 @@ use serde_json::{json, Value};
 
 use crate::ai::provider::ChatMessage;
 use crate::computer::{
-    apps::{list_apps, open_app, AppDescriptor},
+    apps::list_apps,
     automation::{auto_perform, AutoAction},
-    clipboard::{clipboard_read, clipboard_write, ClipboardContent},
-    commands::ExecResult,
-    files::{file_read, FileReadResult},
+    clipboard::{clipboard_read, clipboard_write},
+    files::file_read,
     safety::{SafetyDecision, SafetyPolicy},
     screenshot,
 };
 use crate::error::{AegisError, Result};
-use crate::memory::KnowledgeEntry;
 
 /// JSON schema fragment advertising a single tool to the AI.
 /// We use the OpenAI "tools" array shape so it works with any OpenAI-compat
@@ -529,8 +527,9 @@ pub fn dispatch(
         "memory_lookup" => run_memory_lookup(memory, &call.arguments),
         "memory_search" => run_memory_search(memory, &call.arguments),
         "skill_set" => run_skill_set(&call.arguments),
-        "skill_list" => serde_json::to_string(&crate::ai::skills::all_skills())
-            .unwrap_or_else(|_| "[]".into()),
+        "skill_list" => {
+            serde_json::to_string(&crate::ai::skills::all_skills()).unwrap_or_else(|_| "[]".into())
+        }
         other => format!("{{\"error\":\"unknown tool '{other}'\"}}"),
     };
 
@@ -594,10 +593,12 @@ fn run_file_write(policy: &SafetyPolicy, args: &Value) -> String {
         None => return json!({"error":"missing 'content' argument"}).to_string(),
     };
     match policy.check_file_write(&path) {
-        SafetyDecision::Allow => match crate::computer::files::file_write_authorized(&path, &content) {
-            Ok(_) => json!({"ok": true, "path": path, "bytes": content.len()}).to_string(),
-            Err(e) => error_json("file_write", &e),
-        },
+        SafetyDecision::Allow => {
+            match crate::computer::files::file_write_authorized(&path, &content) {
+                Ok(_) => json!({"ok": true, "path": path, "bytes": content.len()}).to_string(),
+                Err(e) => error_json("file_write", &e),
+            }
+        }
         SafetyDecision::Deny { reason } => json!({
             "safety_decision": "deny",
             "reason": reason,
@@ -657,9 +658,7 @@ fn run_app_open(policy: &SafetyPolicy, args: &Value) -> String {
 
 // Tiny adapter so we don't need to import open_app_authorized through safety.
 fn open_app_allow(name: &str) -> Result<()> {
-    if let Err(e) = crate::computer::apps::open_app_authorized(name) {
-        return Err(e);
-    }
+    crate::computer::apps::open_app_authorized(name)?;
     Ok(())
 }
 
@@ -670,7 +669,12 @@ fn run_gui_action(args: &Value) -> String {
     };
     let actions: Vec<AutoAction> = match serde_json::from_value(actions_val.clone()) {
         Ok(v) => v,
-        Err(e) => return json!({"error":"failed to parse actions: {e}"}).to_string(),
+        Err(e) => {
+            return json!({
+                "error": format!("failed to parse actions: {e}")
+            })
+            .to_string();
+        }
     };
     match auto_perform(actions) {
         Ok(_) => json!({"ok": true}).to_string(),
@@ -698,7 +702,8 @@ fn run_web_search(args: &Value) -> String {
         None => return json!({"error":"missing 'query' argument"}).to_string(),
     };
     let results = crate::ai::web::web_search_sync(&query);
-    serde_json::to_string(&results).unwrap_or_else(|_| json!({"error":"serialization failed"}).to_string())
+    serde_json::to_string(&results)
+        .unwrap_or_else(|_| json!({"error":"serialization failed"}).to_string())
 }
 
 fn run_memory_remember(
@@ -854,13 +859,20 @@ fn walk_dir(
             return;
         }
         let p = entry.path();
-        let rel = p.strip_prefix(root).unwrap_or(&p).to_string_lossy().to_string();
+        let rel = p
+            .strip_prefix(root)
+            .unwrap_or(&p)
+            .to_string_lossy()
+            .to_string();
         if re.is_match(&rel) {
             out.push(p.to_string_lossy().to_string());
         }
         if p.is_dir() {
             // Skip heavy / hidden dirs.
-            let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            let name = p
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
             if name.starts_with('.') || name == "node_modules" || name == "target" {
                 continue;
             }
@@ -944,7 +956,10 @@ fn regex_walk(
         }
         let p = entry.path();
         if p.is_dir() {
-            let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            let name = p
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
             if name.starts_with('.') || name == "node_modules" || name == "target" {
                 continue;
             }
@@ -953,12 +968,18 @@ fn regex_walk(
         }
         // Filter by file glob if requested.
         if let Some(file_re) = file_re {
-            let rel = p.strip_prefix(root).unwrap_or(&p).to_string_lossy().to_string();
+            let rel = p
+                .strip_prefix(root)
+                .unwrap_or(&p)
+                .to_string_lossy()
+                .to_string();
             if !file_re.is_match(&rel) {
                 continue;
             }
         }
-        let Ok(text) = std::fs::read_to_string(&p) else { continue };
+        let Ok(text) = std::fs::read_to_string(&p) else {
+            continue;
+        };
         for (i, line) in text.lines().enumerate() {
             if out.len() >= cap {
                 return;
@@ -982,7 +1003,10 @@ fn run_diff_apply(args: &Value) -> String {
     // Try `git apply` first (handles all edge cases). If git isn't available,
     // we fall back to a minimal hand-rolled parser that handles simple
     // @@ -a,b +c,d @@ hunks with pure +/- lines.
-    let tmp = std::env::temp_dir().join(format!("aegis-diff-{}.patch", uuid::Uuid::new_v4().simple()));
+    let tmp = std::env::temp_dir().join(format!(
+        "aegis-diff-{}.patch",
+        uuid::Uuid::new_v4().simple()
+    ));
     if let Err(e) = std::fs::write(&tmp, &diff) {
         return json!({"error": format!("failed to write patch file: {e}")}).to_string();
     }
@@ -1009,71 +1033,130 @@ fn run_diff_apply(args: &Value) -> String {
 
 /// Minimal unified-diff applier — handles `--- /path` + `+++ /path` file
 /// headers and `@@ -a,b +c,d @@` hunk headers with pure +/-/context lines.
+///
+/// This is a fallback used when `git apply` is not available. It supports
+/// the common subset of unified diff produced by `git diff` and `diff -u`:
+/// file headers `--- a/path` / `+++ b/path`, hunk headers `@@ -a,b +c,d @@`,
+/// context lines starting with a space, removed lines starting with `-`,
+/// and added lines starting with `+`. No rename/copy/binary support.
 fn apply_diff_minimal(diff: &str) -> std::result::Result<usize, String> {
     use std::fs;
-    use std::io::Write;
 
     let mut lines = diff.lines().peekable();
     let mut hunks_applied = 0usize;
     while let Some(line) = lines.next() {
-        if line.starts_with("--- ") {
-            let _from = line.trim_start_matches("--- ").trim();
-            let plus = match lines.next() {
-                Some(l) if l.starts_with("+++ ") => l.trim_start_matches("+++ ").trim().to_string(),
-                _ => return Err("malformed diff: --- not followed by +++".into()),
-            };
-            // Strip a/ b/ prefixes.
-            let target = plus
-                .strip_prefix("b/")
-                .or_else(|| plus.strip_prefix("/dev/null"))
-                .unwrap_or(&plus)
-                .to_string();
-            // Read the file into memory.
-            let mut content = fs::read_to_string(&target).unwrap_or_default();
-            let mut new_content = String::new();
-            // Apply hunks until we hit the next file header or EOF.
-            let mut lines_iter = content.lines().peekable();
-            let mut line_no = 0usize;
-            let mut current = String::new();
-            // Slurp the file lines into a Vec for random access.
-            let file_lines: Vec<&str> = content.lines().collect();
-            let mut cursor = 0usize;
-            while let Some(hline) = lines.peek() {
-                if hline.starts_with("--- ") || hline.starts_with("diff --git") {
-                    break;
-                }
-                let hline = lines.next().unwrap();
-                if let Some(rest) = hline.strip_prefix("@@ ") {
-                    // Parse @@ -a,b +c,d @@
-                    let parts: Vec<&str> = rest.split("@@").collect();
-                    let header = parts[0];
-                    let minus: Vec<&str> = header
-                        .split_whitespace()
-                        .find(|t| t.starts_with('-'))
-                        .ok_or("malformed hunk header")?
-                        .trim_start_matches('-')
-                        .splitn(2, ',')
-                        .collect();
-                    let start: usize = minus[0].parse().map_err(|_| "bad hunk start")?;
-                    cursor = if start > 0 { start - 1 } else { 0 };
-                    let _ = &mut current; // silence unused warning
-                    let _ = line_no;
-                    let _ = &mut new_content;
-                    let _ = file_lines;
-                    // Append pre-context up to `cursor`.
-                    // (Minimal implementation: we keep the file as-is if any
-                    // hunk fails to apply cleanly.)
-                    hunks_applied += 1;
-                } else {
-                    // We don't apply individual +/- lines in the minimal
-                    // parser — we just count hunks and let the caller know
-                    // to install git for full support.
-                }
+        if !line.starts_with("--- ") {
+            continue;
+        }
+        let _from = line.trim_start_matches("--- ").trim();
+        let plus = match lines.next() {
+            Some(l) if l.starts_with("+++ ") => l.trim_start_matches("+++ ").trim().to_string(),
+            _ => return Err("malformed diff: --- not followed by +++".into()),
+        };
+        // Strip a/ b/ prefixes.
+        let target = plus
+            .strip_prefix("b/")
+            .or_else(|| plus.strip_prefix("/dev/null"))
+            .unwrap_or(&plus)
+            .to_string();
+        // Read the file into memory (empty if missing — supports "create" hunks).
+        let mut content = fs::read_to_string(&target).unwrap_or_default();
+        // Apply hunks until we hit the next file header or EOF.
+        while let Some(hline) = lines.peek() {
+            if hline.starts_with("--- ") || hline.starts_with("diff --git") {
+                break;
             }
-            // For the minimal parser, we leave the file unchanged and rely
-            // on hunks_applied as a count. Full git apply is the recommended
-            // path.
-            let _ = &mut lines_iter;
+            let hline = lines.next().unwrap();
+            if let Some(rest) = hline.strip_prefix("@@ ") {
+                // Parse `@@ -a,b +c,d @@`
+                let parts: Vec<&str> = rest.split("@@").collect();
+                let header = parts[0];
+                let minus_tok = header
+                    .split_whitespace()
+                    .find(|t| t.starts_with('-'))
+                    .ok_or("malformed hunk header (missing -a,b)")?;
+                let minus: Vec<&str> = minus_tok.trim_start_matches('-').splitn(2, ',').collect();
+                let start: usize = minus[0].parse().map_err(|_| "bad hunk start")?;
+                // Unified diff line numbers are 1-based; convert to 0-based.
+                let mut cursor = start.saturating_sub(1);
+                let mut out = String::new();
+                // Copy content up to the hunk start.
+                let bytes: Vec<&str> = content.lines().collect();
+                for (i, l) in bytes.iter().enumerate() {
+                    if i >= cursor {
+                        break;
+                    }
+                    out.push_str(l);
+                    out.push('\n');
+                }
+                let mut consumed_input = cursor;
+                // Now process lines in this hunk until we exit.
+                while let Some(hl) = lines.peek() {
+                    if hl.starts_with("@@ ")
+                        || hl.starts_with("--- ")
+                        || hl.starts_with("diff --git")
+                    {
+                        break;
+                    }
+                    let hl = lines.next().unwrap();
+                    if let Some(added) = hl.strip_prefix('+') {
+                        out.push_str(added);
+                        out.push('\n');
+                    } else if let Some(removed) = hl.strip_prefix('-') {
+                        // Verify the removed line matches the current input line.
+                        if consumed_input < bytes.len() && bytes[consumed_input] == removed {
+                            consumed_input += 1;
+                            cursor += 1;
+                        } else {
+                            return Err(format!(
+                                "diff does not apply at line {} (expected {:?}, found {:?})",
+                                cursor + 1,
+                                removed,
+                                bytes.get(consumed_input).copied().unwrap_or("")
+                            ));
+                        }
+                    } else if let Some(ctx) = hl.strip_prefix(' ') {
+                        // Context line: must match input.
+                        if consumed_input < bytes.len() && bytes[consumed_input] == ctx {
+                            out.push_str(ctx);
+                            out.push('\n');
+                            consumed_input += 1;
+                            cursor += 1;
+                        } else {
+                            return Err(format!("diff context mismatch at line {}", cursor + 1));
+                        }
+                    } else if hl.is_empty() {
+                        // Empty line in diff is treated as a blank context line.
+                        if consumed_input < bytes.len() && bytes[consumed_input].is_empty() {
+                            out.push('\n');
+                            consumed_input += 1;
+                            cursor += 1;
+                        }
+                    } else if hl.starts_with("\\ ") {
+                        // "\ No newline at end of file" marker — ignore, we always add a trailing newline.
+                    } else {
+                        // Unknown line — bail out.
+                        return Err(format!("unrecognized diff line: {hl}"));
+                    }
+                }
+                // Append the rest of the file after the hunk.
+                for (i, l) in bytes.iter().enumerate() {
+                    if i <= cursor.saturating_sub(1) {
+                        continue;
+                    }
+                    out.push_str(l);
+                    out.push('\n');
+                }
+                content = out;
+                hunks_applied += 1;
+            }
+        }
+        // Write the patched file back. If the new content is empty and the
+        // target exists, treat it as a deletion.
+        if content.is_empty() {
+            let _ = fs::remove_file(&target);
+        } else {
+            fs::write(&target, content).map_err(|e| format!("write {target}: {e}"))?;
         }
     }
     if hunks_applied == 0 {
@@ -1092,7 +1175,10 @@ fn run_http_fetch(args: &Value) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or("GET")
         .to_uppercase();
-    let body = args.get("body").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let body = args
+        .get("body")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
 
     // v0.6: if the URL looks like an HTML page and method is GET, use the
     // readability extractor so the AI gets plain text instead of raw HTML.
@@ -1140,7 +1226,10 @@ async fn http_fetch_async(url: &str, method: &str, body: Option<String>) -> Stri
         "PUT" => client.put(url),
         "DELETE" => client.delete(url),
         "HEAD" => client.head(url),
-        _ => client.request(reqwest::Method::from_bytes(method.as_bytes()).unwrap_or(reqwest::Method::GET), url),
+        _ => client.request(
+            reqwest::Method::from_bytes(method.as_bytes()).unwrap_or(reqwest::Method::GET),
+            url,
+        ),
     };
     if let Some(b) = body {
         req = req.body(b);
@@ -1288,15 +1377,15 @@ fn run_code_eval(policy: &SafetyPolicy, args: &Value) -> String {
         Some(s) => s.to_string(),
         None => return json!({"error":"missing 'code' argument"}).to_string(),
     };
-    let timeout = args
+    let timeout_seconds = args
         .get("timeout_seconds")
         .and_then(|v| v.as_u64())
-        .unwrap_or(15) as u64;
+        .unwrap_or(15);
 
-    let (interpreter, flag, cmd_str) = match language.as_str() {
-        "python3" | "python" => ("python3", "-c", format!("python3 -c '...'")),
-        "node" | "javascript" | "js" => ("node", "-e", format!("node -e '...'")),
-        "bash" | "sh" => ("bash", "-c", format!("bash -c '...'")),
+    let (interpreter, cmd_str) = match language.as_str() {
+        "python3" | "python" => ("python3", "python3 -c '...'".to_string()),
+        "node" | "javascript" | "js" => ("node", "node -e '...'".to_string()),
+        "bash" | "sh" => ("bash", "bash -c '...'".to_string()),
         other => {
             return json!({"error": format!("unsupported language: {other}")}).to_string();
         }
@@ -1317,9 +1406,13 @@ fn run_code_eval(policy: &SafetyPolicy, args: &Value) -> String {
             if let Err(e) = std::fs::write(&tmp, &code) {
                 return json!({"error": format!("failed to write temp file: {e}")}).to_string();
             }
-            let out = std::process::Command::new(interpreter)
-                .arg(tmp.to_string_lossy().to_string())
-                .output();
+            // Spawn the interpreter and apply a wall-clock timeout. If the
+            // child does not finish within `timeout_seconds`, kill it so
+            // runaway scripts (e.g. `while True: pass`) can't hang the agent.
+            let out = run_with_timeout(
+                std::process::Command::new(interpreter).arg(tmp.to_string_lossy().to_string()),
+                timeout_seconds,
+            );
             let _ = std::fs::remove_file(&tmp);
             match out {
                 Ok(o) => {
@@ -1355,6 +1448,35 @@ fn run_code_eval(policy: &SafetyPolicy, args: &Value) -> String {
     }
 }
 
+/// Run a [`Command`], killing it if it exceeds `timeout_secs`.
+///
+/// Implemented with `spawn()` + `wait()` with a deadline so we don't leak
+/// children when the user asks for a 15-second cap on AI-generated code.
+fn run_with_timeout(
+    cmd: &mut std::process::Command,
+    timeout_secs: u64,
+) -> std::io::Result<std::process::Output> {
+    let start = std::time::Instant::now();
+    let mut child = cmd.spawn()?;
+    let deadline = start + std::time::Duration::from_secs(timeout_secs);
+    loop {
+        match child.try_wait()? {
+            Some(_) => return child.wait_with_output(),
+            None => {
+                if std::time::Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        format!("eval timed out after {timeout_secs}s"),
+                    ));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
+    }
+}
+
 fn run_notify(args: &Value) -> String {
     let title = match args.get("title").and_then(|v| v.as_str()) {
         Some(s) => s.to_string(),
@@ -1378,10 +1500,13 @@ fn run_notify(args: &Value) -> String {
     } else if cfg!(target_os = "macos") {
         std::process::Command::new("osascript")
             .arg("-e")
-            .arg(format!(r#"display notification "{body}" with title "{title}""#))
+            .arg(format!(
+                r#"display notification "{body}" with title "{title}""#
+            ))
             .output()
     } else {
-        return json!({"ok": false, "note": "notifications not supported on this platform"}).to_string();
+        return json!({"ok": false, "note": "notifications not supported on this platform"})
+            .to_string();
     };
     match out {
         Ok(o) if o.status.success() => json!({"ok": true}).to_string(),
@@ -1429,10 +1554,7 @@ fn run_memory_search(
         Some(s) => s.to_string(),
         None => return json!({"error":"missing 'query' argument"}).to_string(),
     };
-    let limit = args
-        .get("limit")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(5) as usize;
+    let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
     // v0.4: simple substring + token-overlap search. A future version will
     // plug in a real vector store.
     let results = memory.knowledge.search(&query, limit);

@@ -10,7 +10,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "aegis-ai"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -19,6 +19,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "directories",
+ "dirs 5.0.1",
  "enigo",
  "futures",
  "hex",
@@ -1420,6 +1421,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
 dependencies = [
  "dirs-sys 0.3.7",
+]
+
+[[package]]
+name = "dirs"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
+dependencies = [
+ "dirs-sys 0.4.1",
 ]
 
 [[package]]

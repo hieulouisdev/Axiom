@@ -36,13 +36,28 @@ pub struct ChatMessage {
 
 impl ChatMessage {
     pub fn system(content: impl Into<String>) -> Self {
-        Self { role: Role::System, content: content.into(), name: None, tool_calls: None }
+        Self {
+            role: Role::System,
+            content: content.into(),
+            name: None,
+            tool_calls: None,
+        }
     }
     pub fn user(content: impl Into<String>) -> Self {
-        Self { role: Role::User, content: content.into(), name: None, tool_calls: None }
+        Self {
+            role: Role::User,
+            content: content.into(),
+            name: None,
+            tool_calls: None,
+        }
     }
     pub fn assistant(content: impl Into<String>) -> Self {
-        Self { role: Role::Assistant, content: content.into(), name: None, tool_calls: None }
+        Self {
+            role: Role::Assistant,
+            content: content.into(),
+            name: None,
+            tool_calls: None,
+        }
     }
 }
 
@@ -157,7 +172,9 @@ pub trait Provider: Send + Sync {
         _req: ChatRequest,
         _on_chunk: Box<dyn Fn(ChatStreamChunk) + Send + Sync>,
     ) -> Result<ChatResponse> {
-        Err(AegisError::Ai("streaming not supported by this provider".into()))
+        Err(AegisError::Ai(
+            "streaming not supported by this provider".into(),
+        ))
     }
 
     /// Lightweight connectivity test.
@@ -294,7 +311,10 @@ impl ProviderRegistry {
     }
 
     pub fn list(&self) -> Vec<ProviderDescriptor> {
-        self.providers.values().map(|p| p.descriptor().clone()).collect()
+        self.providers
+            .values()
+            .map(|p| p.descriptor().clone())
+            .collect()
     }
 
     pub fn get(&self, id: &str) -> Option<Arc<dyn Provider>> {
@@ -309,9 +329,7 @@ impl ProviderRegistry {
         // a dedicated descriptor flag. The `AegisCloudProvider` overrides
         // `requires_api_key` to `true` AND we check whether the env var is set
         // here as a lightweight proxy.
-        if std::env::var("AEGIS_DEFAULT_API_KEY").is_ok()
-            || std::env::var("ZAI_API_KEY").is_ok()
-        {
+        if std::env::var("AEGIS_DEFAULT_API_KEY").is_ok() || std::env::var("ZAI_API_KEY").is_ok() {
             return true;
         }
         if let Ok(entry) = keyring::Entry::new("aegis-ai", "aegis-cloud") {

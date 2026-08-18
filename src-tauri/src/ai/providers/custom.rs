@@ -149,7 +149,9 @@ impl Provider for CustomAnthropicProvider {
                     system_text.push_str(&m.content);
                 }
                 Role::User => messages.push(json!({"role": "user", "content": m.content})),
-                Role::Assistant => messages.push(json!({"role": "assistant", "content": m.content})),
+                Role::Assistant => {
+                    messages.push(json!({"role": "assistant", "content": m.content}))
+                }
                 Role::Tool => messages.push(json!({"role": "user", "content": m.content})),
             }
         }
@@ -163,10 +165,14 @@ impl Provider for CustomAnthropicProvider {
             body["system"] = json!(system_text);
         }
 
-        let client = Client::builder().timeout(std::time::Duration::from_secs(120)).build()?;
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .build()?;
         let mut req_b = client.post(format!("{}/v1/messages", base_url)).json(&body);
         if let Some(key) = creds.api_key {
-            req_b = req_b.header("x-api-key", key).header("anthropic-version", "2023-06-01");
+            req_b = req_b
+                .header("x-api-key", key)
+                .header("anthropic-version", "2023-06-01");
         }
         let resp = req_b.send().await?;
         if !resp.status().is_success() {
@@ -269,8 +275,14 @@ impl Provider for CustomOllamaProvider {
             "stream": false,
         });
 
-        let client = Client::builder().timeout(std::time::Duration::from_secs(300)).build()?;
-        let resp = client.post(format!("{}/api/chat", base_url)).json(&body).send().await?;
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(300))
+            .build()?;
+        let resp = client
+            .post(format!("{}/api/chat", base_url))
+            .json(&body)
+            .send()
+            .await?;
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
@@ -314,7 +326,8 @@ impl WebhookProvider {
         let desc = ProviderDescriptor {
             id: "webhook".into(),
             name: "Webhook (custom HTTP)".into(),
-            description: "POSTs messages to a custom URL; expects {\"text\": \"...\"} response.".into(),
+            description: "POSTs messages to a custom URL; expects {\"text\": \"...\"} response."
+                .into(),
             homepage: "#".into(),
             category: ProviderCategory::Custom,
             requires_api_key: false,
@@ -353,7 +366,9 @@ impl Provider for WebhookProvider {
             .unwrap_or_default();
 
         let body = json!({"prompt": last_user, "messages": req.messages});
-        let client = Client::builder().timeout(std::time::Duration::from_secs(120)).build()?;
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .build()?;
         let mut req_b = client.post(&url).json(&body);
         if let Some(key) = creds.api_key {
             req_b = req_b.bearer_auth(key);

@@ -35,7 +35,10 @@ impl Provider for OpenAiProvider {
     fn set_creds(&self, creds: crate::ai::provider::ProviderCreds) {
         self.0.set_creds(creds)
     }
-    async fn chat(&self, req: crate::ai::provider::ChatRequest) -> crate::error::Result<crate::ai::provider::ChatResponse> {
+    async fn chat(
+        &self,
+        req: crate::ai::provider::ChatRequest,
+    ) -> crate::error::Result<crate::ai::provider::ChatResponse> {
         self.0.chat(req).await
     }
     async fn chat_stream(

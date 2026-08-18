@@ -67,8 +67,7 @@ impl OpenAiWhisper {
             .filter(|s| !s.is_empty())?;
         let base_url = std::env::var("AEGIS_STT_BASE_URL")
             .unwrap_or_else(|_| "https://api.openai.com/v1".to_string());
-        let model = std::env::var("AEGIS_STT_MODEL")
-            .unwrap_or_else(|_| "whisper-1".to_string());
+        let model = std::env::var("AEGIS_STT_MODEL").unwrap_or_else(|_| "whisper-1".to_string());
         let language = std::env::var("AEGIS_STT_LANGUAGE").ok();
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(60))
@@ -128,7 +127,12 @@ impl SpeechToText for OpenAiWhisper {
         let v: serde_json::Value = resp.json().await.map_err(|e| {
             AegisError::Network(format!("whisper response JSON decode failed: {e}"))
         })?;
-        let text = v.get("text").and_then(|t| t.as_str()).unwrap_or("").trim().to_string();
+        let text = v
+            .get("text")
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
         let language = v
             .get("language")
             .and_then(|l| l.as_str())

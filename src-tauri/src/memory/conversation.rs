@@ -129,8 +129,14 @@ impl ConversationStore {
 
     pub fn delete(&self, conversation_id: &str) -> Result<()> {
         let conn = self.conn.lock();
-        conn.execute("DELETE FROM messages WHERE conversation_id = ?1", params![conversation_id])?;
-        conn.execute("DELETE FROM conversations WHERE id = ?1", params![conversation_id])?;
+        conn.execute(
+            "DELETE FROM messages WHERE conversation_id = ?1",
+            params![conversation_id],
+        )?;
+        conn.execute(
+            "DELETE FROM conversations WHERE id = ?1",
+            params![conversation_id],
+        )?;
         Ok(())
     }
 
@@ -180,9 +186,7 @@ impl ConversationStore {
     pub fn get_summary(&self, conversation_id: &str) -> Result<Option<String>> {
         let conn = self.conn.lock();
         let _ = conn.execute_batch("ALTER TABLE conversations ADD COLUMN summary TEXT");
-        let mut stmt = conn.prepare(
-            "SELECT summary FROM conversations WHERE id = ?1"
-        )?;
+        let mut stmt = conn.prepare("SELECT summary FROM conversations WHERE id = ?1")?;
         let mut rows = stmt.query(params![conversation_id])?;
         if let Some(row) = rows.next()? {
             Ok(row.get(0)?)

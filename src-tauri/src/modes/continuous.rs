@@ -19,14 +19,20 @@ pub async fn start(state: Arc<Mutex<AppState>>, app: AppHandle) {
         interval.tick().await;
         // Phase 3: pull pending events from the bus and feed them to the AI.
         // For v0.1, just emit a heartbeat event to keep the UI informed.
-        let _ = app.emit("mode://heartbeat", serde_json::json!({
-            "ts_ms": time::OffsetDateTime::now_utc().unix_timestamp() as u64 * 1000,
-            "mode": "continuous",
-        }));
+        let _ = app.emit(
+            "mode://heartbeat",
+            serde_json::json!({
+                "ts_ms": time::OffsetDateTime::now_utc().unix_timestamp() as u64 * 1000,
+                "mode": "continuous",
+            }),
+        );
         // Activity heartbeat (lightweight — no AI call yet).
         {
             let s = state.lock();
-            let _ = s.memory.activity.record("heartbeat", "continuous-mode tick", None);
+            let _ = s
+                .memory
+                .activity
+                .record("heartbeat", "continuous-mode tick", None);
         }
     }
 }

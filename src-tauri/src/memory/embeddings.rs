@@ -69,8 +69,19 @@ impl Embedding {
 }
 
 /// Hash a string into a sparse vector using character-trigram feature
-/// hashing. Each trigram is hashed into one of `dim` buckets; the bucket
-/// value is the count of trigrams that landed there.
+/// hashing plus word-unigram features. Each trigram and each word is
+/// hashed into one of `dim` buckets; the bucket value is the count of
+/// features that landed there.
+///
+/// Combining char-trigrams (good for typos and morphology) with word
+/// unigrams (good for semantic concepts like "dog" matching "dog")
+/// produces a meaningfully better retrieval quality than trigrams alone,
+/// which is what the v0.5 RAG pipeline needs.
+///
+/// Word features are only added when the input contains at least two
+/// words. Single-word inputs (e.g. "calendar" vs "calender") rely on
+/// trigram overlap alone — that's where typo tolerance matters most and
+/// word features would only dilute the signal.
 pub fn embed_text(text: &str, dim: usize) -> Embedding {
     let mut v = vec![0.0f32; dim];
     let lower = text.to_lowercase();
@@ -91,6 +102,20 @@ pub fn embed_text(text: &str, dim: usize) -> Embedding {
             let s: String = w.iter().collect();
             let h = fxhash_str(&s) as usize % dim;
             v[h] += 1.0;
+        }
+        // For multi-word inputs, also hash word unigrams. Word-level
+        // features give "dog" in the query a chance to match "dog" in
+        // the stored fact directly, even when the surrounding
+        // characters don't line up into shared trigrams.
+        let words: Vec<&str> = lower
+            .split(|c: char| c.is_whitespace() || !c.is_alphanumeric())
+            .filter(|s| s.len() >= 3)
+            .collect();
+        if words.len() >= 2 {
+            for word in words {
+                let h = fxhash_str(word) as usize % dim;
+                v[h] += 2.0; // weight words slightly higher than trigrams
+            }
         }
     }
     // L2 normalize so cosine is just a dot product. Skip if all-zero.
@@ -132,11 +157,7 @@ impl EmbeddingStore {
     /// Insert or update the embedding for a given knowledge key.
     pub fn upsert(&self, key: &str, text: &str) -> Result<()> {
         let emb = embed_text(text, EMBED_DIM);
-        let blob: Vec<u8> = emb
-            .values
-            .iter()
-            .flat_map(|f| f.to_le_bytes())
-            .collect();
+        let blob: Vec<u8> = emb.values.iter().flat_map(|f| f.to_le_bytes()).collect();
         let now_ms = time::OffsetDateTime::now_utc().unix_timestamp() as u64 * 1000;
         let conn = self.conn.lock();
         conn.execute(
@@ -151,7 +172,10 @@ impl EmbeddingStore {
     /// Delete an embedding by key.
     pub fn delete(&self, key: &str) -> Result<()> {
         let conn = self.conn.lock();
-        conn.execute("DELETE FROM knowledge_embeddings WHERE key=?1", params![key])?;
+        conn.execute(
+            "DELETE FROM knowledge_embeddings WHERE key=?1",
+            params![key],
+        )?;
         Ok(())
     }
 
@@ -191,7 +215,10 @@ impl EmbeddingStore {
             let key: String = row.get(0)?;
             let _ = conn.execute(
                 "UPDATE knowledge SET use_count=use_count+1, last_used_ms=?1 WHERE key=?2",
-                params![time::OffsetDateTime::now_utc().unix_timestamp() as i64 * 1000, &key],
+                params![
+                    time::OffsetDateTime::now_utc().unix_timestamp() * 1000,
+                    &key
+                ],
             );
             let entry = KnowledgeEntry {
                 key,

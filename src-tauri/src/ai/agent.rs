@@ -40,21 +40,18 @@
 //!   the confirmation request to the frontend via `agent://confirmation`.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::Emitter;
-use tokio::sync::watch;
 
+use crate::ai::provider::ProviderRegistry;
 use crate::ai::provider::{ChatMessage, ChatRequest, ChatStreamChunk};
 use crate::ai::router::AiRouter;
-use crate::ai::provider::ProviderRegistry;
 use crate::ai::tools::{self, ToolCall, ToolResult, ToolSpec};
 use crate::computer::safety::SafetyPolicy;
-use crate::config::AppConfig;
 use crate::error::{AegisError, Result};
-use crate::memory::store::MemoryStore;
 use crate::state::AppState;
 
 /// Default per-turn iteration cap.
@@ -165,20 +162,26 @@ pub async fn run_agent_loop(
 
         match result {
             Ok(r) => {
-                let _ = app_clone.emit(EVENT_DONE, &serde_json::json!({
-                    "run_id": run_id_clone,
-                    "conversation_id": r.conversation_id,
-                    "iterations": r.iterations,
-                    "tool_calls": r.tool_calls,
-                    "duration_ms": r.duration_ms,
-                }));
+                let _ = app_clone.emit(
+                    EVENT_DONE,
+                    &serde_json::json!({
+                        "run_id": run_id_clone,
+                        "conversation_id": r.conversation_id,
+                        "iterations": r.iterations,
+                        "tool_calls": r.tool_calls,
+                        "duration_ms": r.duration_ms,
+                    }),
+                );
             }
             Err(e) => {
                 tracing::error!("agent loop failed: {e:#}");
-                let _ = app_clone.emit(EVENT_ERROR, &serde_json::json!({
-                    "run_id": run_id_clone,
-                    "error": e.to_string(),
-                }));
+                let _ = app_clone.emit(
+                    EVENT_ERROR,
+                    &serde_json::json!({
+                        "run_id": run_id_clone,
+                        "error": e.to_string(),
+                    }),
+                );
             }
         }
     });
@@ -198,8 +201,7 @@ async fn agent_loop_inner(
     let max_iters = params
         .max_iterations
         .unwrap_or(DEFAULT_MAX_ITERATIONS)
-        .min(ABSOLUTE_MAX_ITERATIONS)
-        .max(1);
+        .clamp(1, ABSOLUTE_MAX_ITERATIONS);
 
     // Load history.
     let history = {
@@ -264,7 +266,7 @@ async fn agent_loop_inner(
         }
     }
 
-    let tool_specs: Vec<ToolSpec> = tools::all_specs();
+    let _tool_specs: Vec<ToolSpec> = tools::all_specs();
     let tools_json = tools::specs_as_json();
 
     let mut iterations = 0u32;
@@ -336,7 +338,10 @@ async fn agent_loop_inner(
                 content.push_str("\n\n[tool_calls]:\n");
                 content.push_str(&calls_json);
             }
-            let _ = s.memory.conversations.add_message(&conv_id, "assistant", &content);
+            let _ = s
+                .memory
+                .conversations
+                .add_message(&conv_id, "assistant", &content);
         }
 
         final_content = assistant_text.clone();
@@ -367,22 +372,28 @@ async fn agent_loop_inner(
             // Rate-limit check.
             if !crate::computer::rate_limiter::try_consume() {
                 tracing::warn!("agent loop rate-limited at iter {iterations}");
-                let _ = app.emit(EVENT_ERROR, &serde_json::json!({
-                    "error": "rate limit exceeded — too many actions per minute",
-                    "iteration": iterations,
-                }));
+                let _ = app.emit(
+                    EVENT_ERROR,
+                    &serde_json::json!({
+                        "error": "rate limit exceeded — too many actions per minute",
+                        "iteration": iterations,
+                    }),
+                );
                 return Err(AegisError::SafetyDenial(
                     "rate limit exceeded — too many actions per minute".into(),
                 ));
             }
 
             // Emit pre-dispatch event.
-            let _ = app.emit(EVENT_TOOL_CALL, &serde_json::json!({
-                "iteration": iterations,
-                "tool_call_id": call.id,
-                "name": call.name,
-                "arguments": call.arguments,
-            }));
+            let _ = app.emit(
+                EVENT_TOOL_CALL,
+                &serde_json::json!({
+                    "iteration": iterations,
+                    "tool_call_id": call.id,
+                    "name": call.name,
+                    "arguments": call.arguments,
+                }),
+            );
 
             // Audit-log the call.
             {
@@ -399,12 +410,15 @@ async fn agent_loop_inner(
                 s.memory.clone()
             };
             let result: ToolResult = tools::dispatch(call, &policy, &memory_arc);
-            let _ = app.emit(EVENT_TOOL_RESULT, &serde_json::json!({
-                "tool_call_id": result.tool_call_id,
-                "name": result.name,
-                "content": result.content,
-                "success": result.success,
-            }));
+            let _ = app.emit(
+                EVENT_TOOL_RESULT,
+                &serde_json::json!({
+                    "tool_call_id": result.tool_call_id,
+                    "name": result.name,
+                    "content": result.content,
+                    "success": result.success,
+                }),
+            );
 
             // If the tool required confirmation, surface it and stop.
             if result
@@ -412,11 +426,14 @@ async fn agent_loop_inner(
                 .contains("\"safety_decision\":\"require_confirmation\"")
             {
                 confirmations_pending += 1;
-                let _ = app.emit(EVENT_CONFIRMATION, &serde_json::json!({
-                    "tool_call_id": result.tool_call_id,
-                    "name": result.name,
-                    "content": result.content,
-                }));
+                let _ = app.emit(
+                    EVENT_CONFIRMATION,
+                    &serde_json::json!({
+                        "tool_call_id": result.tool_call_id,
+                        "name": result.name,
+                        "content": result.content,
+                    }),
+                );
                 // Append the tool result so the AI can see it on the next
                 // turn if the user re-runs the loop.
                 messages.push(tools::result_to_message(&result));
@@ -466,7 +483,9 @@ async fn agent_loop_inner(
         let s = state.lock();
         let _ = s.memory.activity.record(
             "agent.done",
-            &format!("agent run finished in {conv_id} (iters={iterations}, tools={tool_calls_total})"),
+            &format!(
+                "agent run finished in {conv_id} (iters={iterations}, tools={tool_calls_total})"
+            ),
             None,
         );
     }

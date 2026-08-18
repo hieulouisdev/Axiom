@@ -20,6 +20,20 @@
 //! - CalDAV calendar integration + intent dispatch (v0.5)
 //! - Bilingual UI (English default, Vietnamese)
 
+// Provider factories intentionally return `Arc<dyn Provider>` rather than
+// `Self`, because each provider is registered by id into a heterogeneous
+// registry. The `new_ret_no_self` lint would otherwise fire on every
+// provider module.
+#![allow(clippy::new_ret_no_self)]
+// A few Tauri command handlers legitimately accept 7+ arguments because they
+// mirror the typed Tauri command ABI. Clippy's default threshold of 7 is too
+// tight here.
+#![allow(clippy::too_many_arguments)]
+// The `&PathBuf` -> `&Path` lint fires on getters that simply forward to
+// inner `&PathBuf` fields; the cost of `&PathBuf` is identical to `&Path`
+// at the ABI level and the explicit type signals ownership to callers.
+#![allow(clippy::ptr_arg)]
+
 pub mod ai;
 pub mod calendar;
 pub mod commands;
@@ -35,8 +49,8 @@ pub mod voice;
 
 use std::sync::Arc;
 
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
-use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
 
 use crate::state::AppState;
 
@@ -97,24 +111,22 @@ pub fn run() {
                         }
                     }
                 })
-                .on_menu_event(move |app, event| {
-                    match event.id.as_ref() {
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
+                .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
                         }
-                        "hide" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.hide();
-                            }
-                        }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
                     }
+                    "hide" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.hide();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
                 })
                 .build(app);
 
@@ -237,7 +249,7 @@ pub fn run() {
 }
 
 fn init_tracing() {
-    use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,aegis=debug"));

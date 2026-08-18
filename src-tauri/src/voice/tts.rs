@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AegisError, Result};
 
 /// TTS options passed by the caller.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TtsOptions {
     /// Voice ID or name. None = the backend's default voice.
     pub voice: Option<String>,
@@ -28,16 +28,6 @@ pub struct TtsOptions {
     pub rate: Option<u32>,
     /// Optional output path. None = pick a temp file.
     pub out_path: Option<String>,
-}
-
-impl Default for TtsOptions {
-    fn default() -> Self {
-        Self {
-            voice: None,
-            rate: None,
-            out_path: None,
-        }
-    }
 }
 
 /// Result of a TTS synthesis.
@@ -109,22 +99,20 @@ impl Default for LocalTts {
 impl TextToSpeech for LocalTts {
     async fn synthesize(&self, text: &str, opts: &TtsOptions) -> Result<SynthesizedSpeech> {
         if text.trim().is_empty() {
-            return Err(AegisError::Internal(
-                "tts: text is empty".to_string(),
-            ));
+            return Err(AegisError::Internal("tts: text is empty".to_string()));
         }
         let out_path = opts.out_path.clone().unwrap_or_else(|| {
             let dir = std::env::temp_dir();
             let stem = format!("aegis-tts-{}", uuid::Uuid::new_v4().simple());
-            if cfg!(target_os = "linux") {
-                dir.join(format!("{stem}.wav")).to_string_lossy().to_string()
-            } else if cfg!(windows) {
-                dir.join(format!("{stem}.wav")).to_string_lossy().to_string()
-            } else if cfg!(target_os = "macos") {
-                dir.join(format!("{stem}.aiff")).to_string_lossy().to_string()
+            // macOS `say` writes AIFF; Linux espeak and Windows SAPI both write WAV.
+            let ext = if cfg!(target_os = "macos") {
+                "aiff"
             } else {
-                dir.join(format!("{stem}.wav")).to_string_lossy().to_string()
-            }
+                "wav"
+            };
+            dir.join(format!("{stem}.{ext}"))
+                .to_string_lossy()
+                .to_string()
         });
 
         let (mime, duration_ms) = if cfg!(target_os = "linux") {
@@ -175,14 +163,17 @@ impl LocalTts {
                 }
             };
             let mut cmd = std::process::Command::new(bin);
-            cmd.arg("-w").arg(&out_owned).arg("-s").arg(rate.to_string());
+            cmd.arg("-w")
+                .arg(&out_owned)
+                .arg("-s")
+                .arg(rate.to_string());
             if let Some(v) = &voice {
                 cmd.arg("-v").arg(v);
             }
             cmd.arg(&text_owned);
-            let out = cmd.output().map_err(|e| {
-                AegisError::Internal(format!("tts: failed to spawn {bin}: {e}"))
-            })?;
+            let out = cmd
+                .output()
+                .map_err(|e| AegisError::Internal(format!("tts: failed to spawn {bin}: {e}")))?;
             if !out.status.success() {
                 return Err(AegisError::Internal(format!(
                     "tts: {bin} exited with status {}: {}",
@@ -205,10 +196,7 @@ impl LocalTts {
     ) -> Result<(String, u64)> {
         // Build a PowerShell snippet that uses System.Speech.Synthesis.
         // System.Speech ships with .NET Framework (pre-installed on Windows 10+).
-        let voice_arg = opts
-            .voice
-            .clone()
-            .unwrap_or_else(|| "".to_string());
+        let voice_arg = opts.voice.clone().unwrap_or_default();
         let rate = opts.rate.unwrap_or(0) as i32;
         let text_owned = text.replace('\'', "''");
         let out_owned = out_path.replace('\'', "''");
@@ -253,7 +241,10 @@ $synth.Dispose();
         let rate = opts.rate.unwrap_or(180);
         tokio::task::spawn_blocking(move || -> Result<(String, u64)> {
             let mut cmd = std::process::Command::new("say");
-            cmd.arg("-o").arg(&out_owned).arg("-r").arg(rate.to_string());
+            cmd.arg("-o")
+                .arg(&out_owned)
+                .arg("-r")
+                .arg(rate.to_string());
             if let Some(v) = &voice {
                 cmd.arg("-v").arg(v);
             }
@@ -314,9 +305,7 @@ impl ElevenLabsTts {
 impl TextToSpeech for ElevenLabsTts {
     async fn synthesize(&self, text: &str, opts: &TtsOptions) -> Result<SynthesizedSpeech> {
         if text.trim().is_empty() {
-            return Err(AegisError::Internal(
-                "tts: text is empty".to_string(),
-            ));
+            return Err(AegisError::Internal("tts: text is empty".to_string()));
         }
         let voice_id = opts
             .voice
@@ -380,15 +369,9 @@ impl TextToSpeech for ElevenLabsTts {
 fn which_first(candidates: &[&str]) -> Option<String> {
     for c in candidates {
         let out = if cfg!(windows) {
-            std::process::Command::new("where")
-                .arg(c)
-                .output()
-                .ok()
+            std::process::Command::new("where").arg(c).output().ok()
         } else {
-            std::process::Command::new("which")
-                .arg(c)
-                .output()
-                .ok()
+            std::process::Command::new("which").arg(c).output().ok()
         };
         if let Some(o) = out {
             if o.status.success() {

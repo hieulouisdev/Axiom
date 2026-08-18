@@ -18,7 +18,10 @@ impl DeepInfraProvider {
             false,
             Some("https://api.deepinfra.com/v1/openai"),
             "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-            &["meta-llama/Llama-3.3-70B-Instruct-Turbo", "deepseek-ai/DeepSeek-R1"],
+            &[
+                "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                "deepseek-ai/DeepSeek-R1",
+            ],
             true,
         ))
     }

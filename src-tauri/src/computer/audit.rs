@@ -146,7 +146,16 @@ pub fn wipe(conn: &rusqlite::Connection) -> Result<()> {
 }
 
 /// Convenience wrapper for the rest of the crate.
-pub fn append_via(store: &MemoryStore, conv: Option<&str>, run: Option<&str>, tool: &str, args: &serde_json::Value, result: &str, outcome: &str, dur_ms: u64) -> Result<i64> {
+pub fn append_via(
+    store: &MemoryStore,
+    conv: Option<&str>,
+    run: Option<&str>,
+    tool: &str,
+    args: &serde_json::Value,
+    result: &str,
+    outcome: &str,
+    dur_ms: u64,
+) -> Result<i64> {
     let conn = store.shared_conn();
     let conn = conn.lock();
     append(&conn, conv, run, tool, args, result, outcome, dur_ms)

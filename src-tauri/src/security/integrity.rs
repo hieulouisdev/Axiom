@@ -33,7 +33,11 @@ pub fn critical_files() -> Vec<String> {
             files.push(home.join(".bashrc").to_string_lossy().into_owned());
             files.push(home.join(".bash_profile").to_string_lossy().into_owned());
             files.push(home.join(".profile").to_string_lossy().into_owned());
-            files.push(home.join(".ssh/authorized_keys").to_string_lossy().into_owned());
+            files.push(
+                home.join(".ssh/authorized_keys")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
             files.push(home.join(".ssh/config").to_string_lossy().into_owned());
         }
         files.push("/etc/hosts".into());
@@ -60,7 +64,8 @@ pub fn critical_files() -> Vec<String> {
         // On Windows, we check key startup locations
         // (registry would require the windows crate, so we check known paths)
         if let Some(appdata) = std::env::var_os("APPDATA") {
-            let startup = PathBuf::from(&appdata).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
+            let startup =
+                PathBuf::from(&appdata).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
             if startup.exists() {
                 if let Ok(entries) = std::fs::read_dir(&startup) {
                     for entry in entries.flatten() {
@@ -78,8 +83,7 @@ pub fn critical_files() -> Vec<String> {
 
 /// Compute SHA-256 hash of a file.
 pub fn file_hash(path: &str) -> Result<String> {
-    let bytes = std::fs::read(path)
-        .map_err(|e| AegisError::Io(format!("reading {path}: {e}")))?;
+    let bytes = std::fs::read(path).map_err(|e| AegisError::Io(format!("reading {path}: {e}")))?;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
     Ok(hex::encode(hasher.finalize()))
@@ -175,12 +179,10 @@ pub fn load_baselines_from_db(conn: &rusqlite::Connection) -> Result<()> {
             path TEXT PRIMARY KEY,
             hash_sha256 TEXT NOT NULL,
             saved_at_ms INTEGER NOT NULL
-        );"
+        );",
     )?;
 
-    let mut stmt = conn.prepare(
-        "SELECT path, hash_sha256 FROM integrity_baselines"
-    )?;
+    let mut stmt = conn.prepare("SELECT path, hash_sha256 FROM integrity_baselines")?;
 
     let rows = stmt.query_map([], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -188,10 +190,8 @@ pub fn load_baselines_from_db(conn: &rusqlite::Connection) -> Result<()> {
 
     let mut baselines = BASELINES.lock();
     baselines.clear();
-    for row in rows {
-        if let Ok((path, hash)) = row {
-            baselines.insert(path, hash);
-        }
+    for (path, hash) in rows.flatten() {
+        baselines.insert(path, hash);
     }
 
     Ok(())

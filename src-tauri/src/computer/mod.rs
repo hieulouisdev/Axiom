@@ -23,7 +23,9 @@ pub mod screen;
 
 pub use apps::{list_apps, open_app, AppDescriptor};
 pub use automation::{auto_perform, AutoAction};
-pub use clipboard::{clipboard_read, clipboard_write, clipboard_watch_start, clipboard_watch_stop, ClipboardContent};
+pub use clipboard::{
+    clipboard_read, clipboard_watch_start, clipboard_watch_stop, clipboard_write, ClipboardContent,
+};
 pub use commands::{exec_command, ExecResult};
 pub use files::{file_read, file_write, FileReadResult};
 pub use safety::{ActionRisk, SafetyCheck, SafetyDecision, SafetyPolicy};

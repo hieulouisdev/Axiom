@@ -76,8 +76,7 @@ fn write_file_inner(path: &str, content: &str) -> Result<()> {
     if let Some(parent) = p.parent() {
         std::fs::create_dir_all(parent).ok();
     }
-    std::fs::write(&p, content).map_err(|e| {
-        AegisError::Io(format!("failed to write to {path}: {e}"))
-    })?;
+    std::fs::write(&p, content)
+        .map_err(|e| AegisError::Io(format!("failed to write to {path}: {e}")))?;
     Ok(())
 }

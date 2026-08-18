@@ -30,21 +30,16 @@ use crate::error::Result;
 /// Current encryption status of the on-disk SQLite database.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum EncryptionStatus {
     /// SQLCipher feature is not compiled in.
+    #[default]
     NotSupported,
     /// SQLCipher is available but the user hasn't set a passphrase.
     Disabled,
     /// Database is encrypted at rest with a passphrase stored in the
     /// OS keychain.
     Enabled,
-}
-
-impl Default for EncryptionStatus {
-    fn default() -> Self {
-        // v0.6 ships without SQLCipher compiled in.
-        EncryptionStatus::NotSupported
-    }
 }
 
 /// Returns whether the running binary was compiled with SQLCipher support.

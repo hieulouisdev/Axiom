@@ -3,7 +3,7 @@ resolver = "2"
 members = ["src-tauri"]
 
 [workspace.package]
-version = "0.8.0"
+version = "1.0.0"
 edition = "2021"
 rust-version = "1.97.1"
 authors = ["Aegis AI Contributors"]
@@ -48,6 +48,7 @@ ring = "0.17"
 
 # Configuration
 directories = "5.0"
+dirs = "5.0"
 toml = "0.8"
 
 [profile.release]

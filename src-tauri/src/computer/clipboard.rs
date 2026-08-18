@@ -3,8 +3,6 @@
 //! Provides commands for reading/writing the system clipboard and
 //! a watch mode that logs clipboard changes to the activity store.
 
-use std::sync::Arc;
-
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
@@ -98,14 +96,14 @@ fn read_clipboard_text() -> Result<String> {
                 return Ok(String::from_utf8_lossy(&output.stdout).to_string());
             }
         }
-        if let Ok(output) = std::process::Command::new("wl-paste")
-            .output()
-        {
+        if let Ok(output) = std::process::Command::new("wl-paste").output() {
             if output.status.success() {
                 return Ok(String::from_utf8_lossy(&output.stdout).to_string());
             }
         }
-        Err(AegisError::Internal("no clipboard tool available (install xclip, xsel, or wl-paste)".into()))
+        Err(AegisError::Internal(
+            "no clipboard tool available (install xclip, xsel, or wl-paste)".into(),
+        ))
     }
 
     #[cfg(windows)]
@@ -118,12 +116,16 @@ fn read_clipboard_text() -> Result<String> {
                 return Ok(String::from_utf8_lossy(&output.stdout).to_string());
             }
         }
-        Err(AegisError::Internal("clipboard read failed on Windows".into()))
+        Err(AegisError::Internal(
+            "clipboard read failed on Windows".into(),
+        ))
     }
 
     #[cfg(not(any(unix, windows)))]
     {
-        Err(AegisError::Internal("clipboard not supported on this platform".into()))
+        Err(AegisError::Internal(
+            "clipboard not supported on this platform".into(),
+        ))
     }
 }
 
@@ -180,25 +182,35 @@ fn write_clipboard_text(text: &str) -> Result<()> {
                 }
             }
         }
-        Err(AegisError::Internal("no clipboard tool available (install xclip, xsel, or wl-copy)".into()))
+        Err(AegisError::Internal(
+            "no clipboard tool available (install xclip, xsel, or wl-copy)".into(),
+        ))
     }
 
     #[cfg(windows)]
     {
         if let Ok(status) = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", &format!("Set-Clipboard -Value '{}'", text.replace('\'', "''"))])
+            .args([
+                "-NoProfile",
+                "-Command",
+                &format!("Set-Clipboard -Value '{}'", text.replace('\'', "''")),
+            ])
             .status()
         {
             if status.success() {
                 return Ok(());
             }
         }
-        Err(AegisError::Internal("clipboard write failed on Windows".into()))
+        Err(AegisError::Internal(
+            "clipboard write failed on Windows".into(),
+        ))
     }
 
     #[cfg(not(any(unix, windows)))]
     {
         let _ = text;
-        Err(AegisError::Internal("clipboard not supported on this platform".into()))
+        Err(AegisError::Internal(
+            "clipboard not supported on this platform".into(),
+        ))
     }
 }

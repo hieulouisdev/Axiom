@@ -9,7 +9,7 @@ use std::sync::RwLock;
 
 use async_trait::async_trait;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::error::{AegisError, Result};
@@ -32,7 +32,11 @@ impl OpenAiCompatProvider {
             .timeout(std::time::Duration::from_secs(120))
             .build()
             .expect("reqwest client");
-        Self { descriptor, creds: RwLock::new(ProviderCreds::default()), client }
+        Self {
+            descriptor,
+            creds: RwLock::new(ProviderCreds::default()),
+            client,
+        }
     }
 
     fn creds(&self) -> ProviderCreds {
@@ -54,15 +58,11 @@ impl OpenAiCompatProvider {
         if self.descriptor.requires_api_key {
             self.creds().api_key.clone()
         } else {
-            self.creds().api_key.clone()
+            None
         }
     }
 
-    async fn do_chat(
-        &self,
-        req: ChatRequest,
-        stream: bool,
-    ) -> Result<reqwest::Response> {
+    async fn do_chat(&self, req: ChatRequest, stream: bool) -> Result<reqwest::Response> {
         let creds = self.creds();
         let model = req
             .model
@@ -186,7 +186,10 @@ impl Provider for OpenAiCompatProvider {
                 }
                 let data = line[5..].trim_start();
                 if data == "[DONE]" {
-                    on_chunk(ChatStreamChunk { delta: String::new(), done: true });
+                    on_chunk(ChatStreamChunk {
+                        delta: String::new(),
+                        done: true,
+                    });
                     continue;
                 }
                 if let Ok(parsed) = serde_json::from_str::<OpenAiChatResponse>(data) {
@@ -261,7 +264,10 @@ pub async fn parse_sse_stream(
             }
             let data = line[5..].trim_start();
             if data == "[DONE]" {
-                on_chunk(ChatStreamChunk { delta: String::new(), done: true });
+                on_chunk(ChatStreamChunk {
+                    delta: String::new(),
+                    done: true,
+                });
                 continue;
             }
             if let Ok(parsed) = serde_json::from_str::<OpenAiChatResponse>(data) {

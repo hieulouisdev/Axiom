@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AegisError, Result};
 
 /// Connection configuration for a CalDAV server.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CalendarConfig {
     /// Full URL to the user's calendar home (e.g.
     /// `https://cloud.example.com/remote.php/dav/calendars/user@example.com/`).
@@ -35,17 +35,6 @@ pub struct CalendarConfig {
     pub password: String,
     /// Calendar display name to filter on (None = use all calendars).
     pub calendar_name: Option<String>,
-}
-
-impl Default for CalendarConfig {
-    fn default() -> Self {
-        Self {
-            url: String::new(),
-            username: String::new(),
-            password: String::new(),
-            calendar_name: None,
-        }
-    }
 }
 
 /// A single calendar event extracted from a VEVENT.
@@ -93,7 +82,9 @@ impl CalendarClient {
         let (today_start_ms, today_end_ms) = today_window_utc();
         let mut all: Vec<CalendarEvent> = Vec::new();
         for cal_url in &cal_urls {
-            let mut ev = self.query_events(cal_url, today_start_ms, today_end_ms).await?;
+            let mut ev = self
+                .query_events(cal_url, today_start_ms, today_end_ms)
+                .await?;
             all.append(&mut ev);
         }
         all.sort_by_key(|e| e.start_ms);
@@ -113,7 +104,10 @@ impl CalendarClient {
 </D:propfind>"#;
         let resp = self
             .http
-            .request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), &self.cfg.url)
+            .request(
+                reqwest::Method::from_bytes(b"PROPFIND").unwrap(),
+                &self.cfg.url,
+            )
             .basic_auth(&self.cfg.username, Some(&self.cfg.password))
             .header("Depth", "1")
             .header("Content-Type", "application/xml; charset=utf-8")
@@ -132,7 +126,8 @@ impl CalendarClient {
         let urls = parse_hrefs(&text, &self.cfg.url);
         // Filter to resources that look like calendar collections (best-effort).
         // Many CalDAV servers report `<D:resourcetype><C:calendar/></D:resourcetype>`.
-        let is_calendar = text.contains("<C:calendar") || text.contains("urn:ietf:params:xml:ns:caldav");
+        let is_calendar =
+            text.contains("<C:calendar") || text.contains("urn:ietf:params:xml:ns:caldav");
         let result: Vec<String> = if is_calendar {
             urls
         } else {
@@ -221,7 +216,11 @@ fn resolve_url(base_url: &str, href: &str) -> String {
     };
     let host_end = after_scheme.find('/').unwrap_or(after_scheme.len());
     let host = &after_scheme[..host_end];
-    let scheme = if scheme_end > 0 { &base_url[..scheme_end] } else { "https" };
+    let scheme = if scheme_end > 0 {
+        &base_url[..scheme_end]
+    } else {
+        "https"
+    };
     if href.starts_with('/') {
         format!("{scheme}://{host}{href}")
     } else {
@@ -296,19 +295,40 @@ fn extract_vevents(ical: &str) -> Vec<CalendarEvent> {
 
 /// Unfold RFC 5545 continuation lines (lines starting with space or tab are
 /// continuations of the previous line).
+///
+/// Per RFC 5545 §3.1, a folded line is split by inserting CRLF followed by
+/// a single linear whitespace character (SPACE or HTAB). Unfolding removes
+/// the CRLF but keeps the whitespace character, so a folded `SUMMARY:Hello
+/// World` becomes `SUMMARY:Hello World` after unfolding — not
+/// `SUMMARY:HelloWorld`. The previous implementation stripped the leading
+/// whitespace, which corrupted any value containing a space at the fold
+/// point.
 fn unfold_lines(ical: &str) -> String {
     let mut out = String::with_capacity(ical.len());
+    let mut first = true;
     for line in ical.lines() {
-        if line.starts_with(' ') || line.starts_with('\t') {
+        let is_continuation = line.starts_with(' ') || line.starts_with('\t');
+        if is_continuation {
+            // Drop the single fold-marker whitespace, keep everything else
+            // (including any subsequent spaces in the value).
+            let continuation = line.get(1..).unwrap_or("");
             if !out.is_empty() {
-                out.push_str(&line[1..]);
+                // Preserve a single separator space at the fold point so the
+                // unfolded value matches what the producer originally wrote.
+                out.push(' ');
+                out.push_str(continuation);
+            } else {
+                // Orphan continuation at the very start of the input — append
+                // verbatim (minus the fold marker).
+                out.push_str(continuation);
             }
         } else {
-            if !out.is_empty() {
+            if !first {
                 out.push('\n');
             }
             out.push_str(line);
         }
+        first = false;
     }
     out
 }
@@ -344,9 +364,7 @@ fn parse_vevent(lines: &[&str]) -> Option<CalendarEvent> {
             _ => {}
         }
     }
-    if dtstart_raw.is_none() {
-        return None;
-    }
+    dtstart_raw.as_ref()?;
     let start_ms = parse_ical_dt(dtstart_raw.as_deref().unwrap_or(""), all_day).unwrap_or(0);
     let end_ms = dtend_raw
         .as_deref()
@@ -409,7 +427,7 @@ fn parse_ical_dt(s: &str, all_day: bool) -> Option<u64> {
 
 /// Naive Gregorian→Unix conversion. No leap-second handling.
 fn ymd_hms_to_unix(year: u32, month: u32, day: u32, hour: u32, min: u32) -> Option<u64> {
-    if month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || min > 59 {
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || min > 59 {
         return None;
     }
     // Days since the Unix epoch (1970-01-01).
@@ -418,8 +436,8 @@ fn ymd_hms_to_unix(year: u32, month: u32, day: u32, hour: u32, min: u32) -> Opti
         days += if is_leap(y) { 366 } else { 365 };
     }
     let mdays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    for m in 0..(month as usize - 1) {
-        days += mdays[m] as i64;
+    for (m, &dm) in mdays.iter().enumerate().take(month as usize - 1) {
+        days += dm as i64;
         if m == 1 && is_leap(year as i64) {
             days += 1;
         }
@@ -513,7 +531,10 @@ mod tests {
 
     #[test]
     fn resolve_relative_url() {
-        let out = resolve_url("https://cloud.example.com/dav/cal/me/", "/dav/cal/me/personal/");
+        let out = resolve_url(
+            "https://cloud.example.com/dav/cal/me/",
+            "/dav/cal/me/personal/",
+        );
         assert_eq!(out, "https://cloud.example.com/dav/cal/me/personal/");
         let out2 = resolve_url("https://cloud.example.com/dav/cal/me/", "personal/");
         assert_eq!(out2, "https://cloud.example.com/personal/");

@@ -3,14 +3,13 @@
 //!
 //! Every command is registered in `lib.rs::run` via `tauri::generate_handler!`.
 
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use tauri::State;
 use tauri::Emitter;
+use tauri::State;
 
 use crate::{
     ai::provider::{ChatMessage, ChatRequest, ChatStreamChunk},
@@ -18,25 +17,31 @@ use crate::{
         apps::{list_apps, open_app, AppDescriptor},
         automation::{auto_perform, AutoAction},
         clipboard::{
-            clipboard_read, clipboard_write, clipboard_watch_start, clipboard_watch_stop,
+            clipboard_read, clipboard_watch_start, clipboard_watch_stop, clipboard_write,
             ClipboardContent,
         },
         commands::{exec_command, ExecResult},
         files::{file_read, file_write, FileReadResult},
-        safety::{SafetyPolicy},
+        safety::SafetyPolicy,
         screenshot,
     },
-    config::{AppConfig, OperatingMode, ProviderCredentials},
+    config::{OperatingMode, ProviderCredentials},
     error::{AegisError, Result},
     i18n,
     memory::{ActivityRecord, Conversation, KnowledgeEntry, Message},
     modes::Mode,
     security::{
-        self, monitor::Threat, quarantine::QuarantineEntry, scanner::ScanResult, DefenseEvent,
-        integrity::IntegrityEvent, network::{NetworkAnomaly, SocketInfo},
-        sandbox::SandboxPolicy, telemetry::TelemetryConfig,
+        self,
+        integrity::IntegrityEvent,
+        monitor::Threat,
+        network::{NetworkAnomaly, SocketInfo},
+        quarantine::QuarantineEntry,
+        sandbox::SandboxPolicy,
+        scanner::ScanResult,
+        DefenseEvent,
     },
     state::AppState,
+    SharedState,
 };
 
 // ===========================================================================
@@ -83,11 +88,10 @@ pub async fn ai_chat(
         s.memory
             .conversations
             .add_message(&conv_id, "user", &params.user_message)?;
-        let _ = s.memory.activity.record(
-            "chat.user",
-            &format!("user message in {conv_id}"),
-            None,
-        );
+        let _ = s
+            .memory
+            .activity
+            .record("chat.user", &format!("user message in {conv_id}"), None);
     }
 
     // Load conversation history.
@@ -156,7 +160,10 @@ pub async fn ai_chat(
             .add_message(&conv_id, "assistant", &resp.message.content)?;
         let _ = s.memory.activity.record(
             "chat.assistant",
-            &format!("assistant replied in {conv_id} ({} chars)", resp.message.content.len()),
+            &format!(
+                "assistant replied in {conv_id} ({} chars)",
+                resp.message.content.len()
+            ),
             None,
         );
     }
@@ -221,8 +228,14 @@ pub async fn ai_chat_stream(
     // Persist user message
     {
         let s = state.lock();
-        s.memory.conversations.add_message(&conv_id, "user", &params.user_message)?;
-        let _ = s.memory.activity.record("chat.user", &format!("streaming user message in {conv_id}"), None);
+        s.memory
+            .conversations
+            .add_message(&conv_id, "user", &params.user_message)?;
+        let _ = s.memory.activity.record(
+            "chat.user",
+            &format!("streaming user message in {conv_id}"),
+            None,
+        );
     }
 
     // Load history
@@ -238,10 +251,13 @@ pub async fn ai_chat_stream(
             _ => ChatMessage::system(m.content),
         })
         .collect();
-    messages.insert(0, ChatMessage::system(
-        "You are Aegis AI, a secure cross-platform assistant. \
-         Be concise, accurate, and refuse any request that would harm the user's system."
-    ));
+    messages.insert(
+        0,
+        ChatMessage::system(
+            "You are Aegis AI, a secure cross-platform assistant. \
+         Be concise, accurate, and refuse any request that would harm the user's system.",
+        ),
+    );
 
     // v0.5: RAG — inject relevant stored facts into the system message.
     {
@@ -281,11 +297,14 @@ pub async fn ai_chat_stream(
         let stream_id_for_chunk = stream_id_clone.clone();
         let stream_id_for_err = stream_id_clone.clone();
         let on_chunk: Box<dyn Fn(ChatStreamChunk) + Send + Sync> = Box::new(move |chunk| {
-            let _ = app_for_chunk.emit("chat://chunk", &serde_json::json!({
-                "stream_id": stream_id_for_chunk,
-                "delta": chunk.delta,
-                "done": chunk.done,
-            }));
+            let _ = app_for_chunk.emit(
+                "chat://chunk",
+                &serde_json::json!({
+                    "stream_id": stream_id_for_chunk,
+                    "delta": chunk.delta,
+                    "done": chunk.done,
+                }),
+            );
         });
 
         let req = ChatRequest {
@@ -337,9 +356,12 @@ pub async fn ai_chat_stream(
         s.cancel_tokens.lock().remove(&stream_id_clone);
 
         if !cancelled {
-            let _ = app.emit("chat://done", &serde_json::json!({
-                "stream_id": stream_id_clone,
-            }));
+            let _ = app.emit(
+                "chat://done",
+                &serde_json::json!({
+                    "stream_id": stream_id_clone,
+                }),
+            );
         }
     });
 
@@ -356,10 +378,7 @@ pub struct ChatStreamStartDto {
 }
 
 #[tauri::command]
-pub fn ai_chat_cancel(
-    state: State<'_, Arc<Mutex<AppState>>>,
-    stream_id: String,
-) -> Result<()> {
+pub fn ai_chat_cancel(state: State<'_, Arc<Mutex<AppState>>>, stream_id: String) -> Result<()> {
     let s = state.lock();
     let mut tokens = s.cancel_tokens.lock();
     if let Some(tx) = tokens.remove(&stream_id) {
@@ -367,7 +386,9 @@ pub fn ai_chat_cancel(
         tracing::info!("cancelled stream: {}", stream_id);
         Ok(())
     } else {
-        Err(AegisError::Internal(format!("no active stream with id {stream_id}")))
+        Err(AegisError::Internal(format!(
+            "no active stream with id {stream_id}"
+        )))
     }
 }
 
@@ -463,7 +484,10 @@ pub fn ai_configure_provider(
         match keyring::Entry::new("aegis-ai", &cfg.provider_id) {
             Ok(entry) => {
                 if let Err(e) = entry.set_password(api_key) {
-                    tracing::warn!("keyring store failed for {}, falling back to config: {e}", cfg.provider_id);
+                    tracing::warn!(
+                        "keyring store failed for {}, falling back to config: {e}",
+                        cfg.provider_id
+                    );
                 } else {
                     tracing::debug!("stored api_key in keyring for {}", cfg.provider_id);
                 }
@@ -567,11 +591,10 @@ pub fn computer_exec_command(
     }
     let r = exec_command(&policy, &params.command)?;
     let s = state.lock();
-    let _ = s.memory.activity.record(
-        "computer.exec",
-        &format!("exec: {}", params.command),
-        None,
-    );
+    let _ = s
+        .memory
+        .activity
+        .record("computer.exec", &format!("exec: {}", params.command), None);
     Ok(r)
 }
 
@@ -691,24 +714,24 @@ pub fn computer_confirm_action(
     let s = state.lock();
     let mut pending_map = s.pending_actions.lock();
 
-    let pending = pending_map.remove(&params.token)
-        .ok_or_else(|| AegisError::SafetyDenial(
-            format!("invalid or expired action token: {}", params.token)
-        ))?;
+    let pending = pending_map.remove(&params.token).ok_or_else(|| {
+        AegisError::SafetyDenial(format!("invalid or expired action token: {}", params.token))
+    })?;
 
     // Check expiry (60 seconds)
     let now_ms = time::OffsetDateTime::now_utc().unix_timestamp() as u64 * 1000;
     let elapsed = now_ms.saturating_sub(pending.created_at_ms);
     if elapsed > ACTION_TOKEN_TTL.as_millis() as u64 {
-        return Err(AegisError::SafetyDenial(
-            format!("action token expired ({}ms old)", elapsed)
-        ));
+        return Err(AegisError::SafetyDenial(format!(
+            "action token expired ({}ms old)",
+            elapsed
+        )));
     }
 
     // Verify action matches
     if pending.action != params.action {
         return Err(AegisError::SafetyDenial(
-            "action does not match the confirmed token".into()
+            "action does not match the confirmed token".into(),
         ));
     }
 
@@ -832,7 +855,8 @@ pub async fn memory_summarize(
     }
 
     // Build a summary request
-    let conversation_text: String = history.iter()
+    let conversation_text: String = history
+        .iter()
         .map(|m| format!("{}: {}", m.role, m.content))
         .collect::<Vec<_>>()
         .join("\n");
@@ -840,7 +864,7 @@ pub async fn memory_summarize(
     let messages = vec![
         ChatMessage::system(
             "You are a summarization assistant. Produce a concise summary of the conversation \
-             that captures the key topics, decisions, and outcomes. Keep it under 200 words."
+             that captures the key topics, decisions, and outcomes. Keep it under 200 words.",
         ),
         ChatMessage::user(&conversation_text),
     ];
@@ -906,19 +930,14 @@ pub fn security_scan(path: String, max_depth: Option<u32>) -> Result<Vec<ScanRes
 }
 
 #[tauri::command]
-pub fn security_quarantine_list(
-    state: State<'_, Arc<Mutex<AppState>>>,
-) -> Vec<QuarantineEntry> {
+pub fn security_quarantine_list(state: State<'_, Arc<Mutex<AppState>>>) -> Vec<QuarantineEntry> {
     let s = state.lock();
     let __moved = s.quarantine.lock().list().to_vec();
     __moved
 }
 
 #[tauri::command]
-pub fn security_restore_file(
-    state: State<'_, Arc<Mutex<AppState>>>,
-    id: String,
-) -> Result<()> {
+pub fn security_restore_file(state: State<'_, Arc<Mutex<AppState>>>, id: String) -> Result<()> {
     let s = state.lock();
     let __moved = s.quarantine.lock().restore(&id);
     __moved
@@ -968,10 +987,7 @@ pub fn modes_get_active(state: State<'_, Arc<Mutex<AppState>>>) -> Mode {
 }
 
 #[tauri::command]
-pub fn modes_set_mode(
-    state: State<'_, Arc<Mutex<AppState>>>,
-    mode: Mode,
-) -> Result<()> {
+pub fn modes_set_mode(state: State<'_, Arc<Mutex<AppState>>>, mode: Mode) -> Result<()> {
     let s = state.lock();
     {
         let mut cfg = s.config.write();
@@ -1014,10 +1030,7 @@ pub struct SettingsDto {
 }
 
 #[tauri::command]
-pub fn settings_set(
-    state: State<'_, Arc<Mutex<AppState>>>,
-    dto: SettingsDto,
-) -> Result<()> {
+pub fn settings_set(state: State<'_, Arc<Mutex<AppState>>>, dto: SettingsDto) -> Result<()> {
     let s = state.lock();
     {
         let mut cfg = s.config.write();
@@ -1229,17 +1242,15 @@ pub fn aegis_cloud_configure(
 
 /// Test the built-in Aegis Cloud provider by sending a minimal ping.
 #[tauri::command]
-pub async fn aegis_cloud_test(
-    state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<()> {
+pub async fn aegis_cloud_test(state: State<'_, Arc<Mutex<AppState>>>) -> Result<()> {
     let providers = {
         let s = state.lock();
         let __moved = (*s.providers.lock()).clone();
         __moved
     };
-    let provider = providers.get("aegis-cloud").ok_or_else(|| {
-        AegisError::AiNotConfigured("aegis-cloud provider not registered".into())
-    })?;
+    let provider = providers
+        .get("aegis-cloud")
+        .ok_or_else(|| AegisError::AiNotConfigured("aegis-cloud provider not registered".into()))?;
     provider.ping().await
 }
 
@@ -1322,7 +1333,9 @@ pub fn ai_list_models() -> serde_json::Value {
 
 /// Returns the catalog entries for a single provider.
 #[tauri::command]
-pub fn ai_models_for_provider(provider_id: String) -> Vec<&'static crate::ai::catalog::CatalogModel> {
+pub fn ai_models_for_provider(
+    provider_id: String,
+) -> Vec<&'static crate::ai::catalog::CatalogModel> {
     crate::ai::catalog::models_for_provider(&provider_id)
 }
 
@@ -1340,7 +1353,9 @@ pub fn skills_list() -> &'static [crate::ai::skills::Skill] {
 #[tauri::command]
 pub fn skills_active() -> Option<String> {
     let path = crate::config::AppConfig::data_dir().join("active_skill");
-    std::fs::read_to_string(&path).ok().map(|s| s.trim().to_string())
+    std::fs::read_to_string(&path)
+        .ok()
+        .map(|s| s.trim().to_string())
 }
 
 /// Set the active skill by id. The agent loop will inject its prompt fragment.
@@ -1369,10 +1384,7 @@ pub fn skills_set(id: String) -> Result<()> {
 /// returns a [`Transcript`] which includes the recognized text, the wake
 /// word detection flag, and the backend name.
 #[tauri::command]
-pub async fn voice_transcribe(
-    audio_b64: String,
-    mime: String,
-) -> Result<crate::voice::Transcript> {
+pub async fn voice_transcribe(audio_b64: String, mime: String) -> Result<crate::voice::Transcript> {
     use base64::Engine as _;
     let audio = base64::engine::general_purpose::STANDARD
         .decode(audio_b64.as_bytes())
@@ -1398,9 +1410,7 @@ pub async fn voice_speak(
 
 /// Return the current push-to-talk hotkey state.
 #[tauri::command]
-pub fn voice_ptt_state(
-    state: State<'_, Arc<Mutex<AppState>>>,
-) -> serde_json::Value {
+pub fn voice_ptt_state(state: State<'_, Arc<Mutex<AppState>>>) -> serde_json::Value {
     let s = state.lock();
     serde_json::json!({
         "state": match s.hotkey.state() {
@@ -1464,11 +1474,7 @@ pub fn calendar_configure(
         let s = state.lock();
         *s.calendar.lock() = new_client;
     }
-    tracing::info!(
-        "calendar configured: url={} user={}",
-        cfg.url,
-        cfg.username
-    );
+    tracing::info!("calendar configured: url={} user={}", cfg.url, cfg.username);
     Ok(())
 }
 
@@ -1665,7 +1671,9 @@ pub fn audit_export(
                 "csv": wtr.to_string(),
             }))
         }
-        _ => Err(AegisError::Config(format!("unknown export format: {format:?}"))),
+        _ => Err(AegisError::Config(format!(
+            "unknown export format: {format:?}"
+        ))),
     }
 }
 
@@ -1673,9 +1681,7 @@ pub fn audit_export(
 /// the "GDPR data export" endpoint (Phase 4.3) — the user can request a
 /// full dump of their data for portability or deletion review.
 #[tauri::command]
-pub fn memory_export_all(
-    state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<serde_json::Value> {
+pub fn memory_export_all(state: State<'_, Arc<Mutex<AppState>>>) -> Result<serde_json::Value> {
     let s = state.lock();
     let convs = s.memory.conversations.list(100_000)?;
     let mut out = Vec::with_capacity(convs.len());
@@ -1687,7 +1693,7 @@ pub fn memory_export_all(
         }));
     }
     Ok(serde_json::json!({
-        "exported_at_ms": time::OffsetDateTime::now_utc().unix_timestamp() as i64 * 1000,
+        "exported_at_ms": time::OffsetDateTime::now_utc().unix_timestamp() * 1000,
         "version": env!("CARGO_PKG_VERSION"),
         "conversation_count": convs.len(),
         "data": out,
@@ -1752,9 +1758,9 @@ impl CsvWriter {
     }
 }
 
-impl CsvWriter {
-    fn to_string(&self) -> String {
-        self.buf.clone()
+impl std::fmt::Display for CsvWriter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.buf)
     }
 }
 
@@ -1782,7 +1788,9 @@ impl From<&SandboxPolicy> for SandboxPolicyDto {
 
 /// Return the current sandbox policy.
 #[tauri::command]
-pub fn sandbox_status(state: State<'_, SharedState>) -> Result<SandboxPolicyDto, String> {
+pub fn sandbox_status(
+    state: State<'_, SharedState>,
+) -> std::result::Result<SandboxPolicyDto, String> {
     let s = state.lock();
     let policy = s.sandbox.lock();
     Ok(SandboxPolicyDto::from(&*policy))
@@ -1790,7 +1798,10 @@ pub fn sandbox_status(state: State<'_, SharedState>) -> Result<SandboxPolicyDto,
 
 /// Enable or disable the sandbox.
 #[tauri::command]
-pub fn sandbox_set_enabled(state: State<'_, SharedState>, enabled: bool) -> Result<(), String> {
+pub fn sandbox_set_enabled(
+    state: State<'_, SharedState>,
+    enabled: bool,
+) -> std::result::Result<(), String> {
     let s = state.lock();
     let mut policy = s.sandbox.lock();
     policy.enabled = enabled;
@@ -1800,7 +1811,10 @@ pub fn sandbox_set_enabled(state: State<'_, SharedState>, enabled: bool) -> Resu
 
 /// Add a directory to the sandbox allow-list.
 #[tauri::command]
-pub fn sandbox_add_dir(state: State<'_, SharedState>, dir: String) -> Result<(), String> {
+pub fn sandbox_add_dir(
+    state: State<'_, SharedState>,
+    dir: String,
+) -> std::result::Result<(), String> {
     let s = state.lock();
     let mut policy = s.sandbox.lock();
     policy.add_allowed_dir(dir);
@@ -1809,7 +1823,10 @@ pub fn sandbox_add_dir(state: State<'_, SharedState>, dir: String) -> Result<(),
 
 /// Remove a directory from the sandbox allow-list.
 #[tauri::command]
-pub fn sandbox_remove_dir(state: State<'_, SharedState>, dir: String) -> Result<(), String> {
+pub fn sandbox_remove_dir(
+    state: State<'_, SharedState>,
+    dir: String,
+) -> std::result::Result<(), String> {
     let s = state.lock();
     let mut policy = s.sandbox.lock();
     policy.remove_allowed_dir(&dir);
@@ -1842,7 +1859,9 @@ impl From<security::telemetry::TelemetrySummary> for TelemetrySummaryDto {
 
 /// Return the current telemetry summary.
 #[tauri::command]
-pub fn telemetry_status(state: State<'_, SharedState>) -> Result<TelemetrySummaryDto, String> {
+pub fn telemetry_status(
+    state: State<'_, SharedState>,
+) -> std::result::Result<TelemetrySummaryDto, String> {
     let s = state.lock();
     let cfg = s.telemetry.lock();
     Ok(TelemetrySummaryDto::from(cfg.summary()))
@@ -1850,7 +1869,7 @@ pub fn telemetry_status(state: State<'_, SharedState>) -> Result<TelemetrySummar
 
 /// Opt in to telemetry collection.
 #[tauri::command]
-pub fn telemetry_opt_in(state: State<'_, SharedState>) -> Result<(), String> {
+pub fn telemetry_opt_in(state: State<'_, SharedState>) -> std::result::Result<(), String> {
     let s = state.lock();
     let mut cfg = s.telemetry.lock();
     cfg.opt_in();
@@ -1859,7 +1878,7 @@ pub fn telemetry_opt_in(state: State<'_, SharedState>) -> Result<(), String> {
 
 /// Opt out of telemetry collection.
 #[tauri::command]
-pub fn telemetry_opt_out(state: State<'_, SharedState>) -> Result<(), String> {
+pub fn telemetry_opt_out(state: State<'_, SharedState>) -> std::result::Result<(), String> {
     let s = state.lock();
     let mut cfg = s.telemetry.lock();
     cfg.opt_out();

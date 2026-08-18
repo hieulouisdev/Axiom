@@ -58,33 +58,35 @@ pub fn detect_anomalies() -> Vec<NetworkAnomaly> {
 
     for socket in &sockets {
         // Check for suspicious listening ports
-        if socket.state == "LISTEN" || socket.state.contains("LISTEN") {
-            if SUSPICIOUS_PORTS.contains(&socket.local_port) {
-                anomalies.push(NetworkAnomaly {
-                    kind: "suspicious_listener".into(),
-                    detail: format!(
-                        "Suspicious port {} listening on {} (pid: {:?})",
-                        socket.local_port, socket.local_addr, socket.pid
-                    ),
-                    severity: super::Severity::High,
-                    timestamp_ms: now_ms,
-                });
-            }
+        if (socket.state == "LISTEN" || socket.state.contains("LISTEN"))
+            && SUSPICIOUS_PORTS.contains(&socket.local_port)
+        {
+            anomalies.push(NetworkAnomaly {
+                kind: "suspicious_listener".into(),
+                detail: format!(
+                    "Suspicious port {} listening on {} (pid: {:?})",
+                    socket.local_port, socket.local_addr, socket.pid
+                ),
+                severity: super::Severity::High,
+                timestamp_ms: now_ms,
+            });
         }
 
         // Check for suspicious outbound connections
-        if !socket.remote_addr.is_empty() && socket.remote_addr != "0.0.0.0" && socket.remote_addr != "::" {
-            if SUSPICIOUS_PORTS.contains(&socket.remote_port) {
-                anomalies.push(NetworkAnomaly {
-                    kind: "suspicious_outbound".into(),
-                    detail: format!(
-                        "Connection to suspicious port {} at {} (pid: {:?})",
-                        socket.remote_port, socket.remote_addr, socket.pid
-                    ),
-                    severity: super::Severity::Critical,
-                    timestamp_ms: now_ms,
-                });
-            }
+        if !socket.remote_addr.is_empty()
+            && socket.remote_addr != "0.0.0.0"
+            && socket.remote_addr != "::"
+            && SUSPICIOUS_PORTS.contains(&socket.remote_port)
+        {
+            anomalies.push(NetworkAnomaly {
+                kind: "suspicious_outbound".into(),
+                detail: format!(
+                    "Connection to suspicious port {} at {} (pid: {:?})",
+                    socket.remote_port, socket.remote_addr, socket.pid
+                ),
+                severity: super::Severity::Critical,
+                timestamp_ms: now_ms,
+            });
         }
     }
 
@@ -182,6 +184,7 @@ fn enumerate_sockets_windows(sockets: &mut Vec<SocketInfo>) -> Result<()> {
     Ok(())
 }
 
+#[cfg(windows)]
 fn parse_addr(addr: &str) -> (String, u16) {
     if let Some(idx) = addr.rfind(':') {
         let ip = &addr[..idx];

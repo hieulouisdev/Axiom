@@ -26,7 +26,10 @@ pub struct AiRouter {
 impl AiRouter {
     pub fn new(config: Arc<ConfigStore>) -> Self {
         let active = config.read().active_provider.clone();
-        Self { config, active_provider: RwLock::new(active) }
+        Self {
+            config,
+            active_provider: RwLock::new(active),
+        }
     }
 
     /// Synchronize the router's cached active-provider id with the config.
@@ -46,9 +49,9 @@ impl AiRouter {
     }
 
     /// Resolve the active provider from a registry.
-    pub fn resolve<'a>(
+    pub fn resolve(
         &self,
-        registry: &'a super::provider::ProviderRegistry,
+        registry: &super::provider::ProviderRegistry,
     ) -> Result<Arc<dyn Provider>> {
         let id = self
             .active_provider

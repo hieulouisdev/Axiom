@@ -67,7 +67,7 @@ impl KnowledgeBase {
             // Bump use count.
             conn.execute(
                 "UPDATE knowledge SET use_count = use_count + 1, last_used_ms = ?1 WHERE key = ?2",
-                params![time::OffsetDateTime::now_utc().unix_timestamp() as i64 * 1000, key],
+                params![time::OffsetDateTime::now_utc().unix_timestamp() * 1000, key],
             )?;
             return Ok(Some(KnowledgeEntry {
                 key: row.get(0)?,
@@ -124,17 +124,15 @@ impl KnowledgeBase {
             "SELECT key, value, source, confidence, created_at_ms, last_used_ms, use_count FROM knowledge",
         )?;
         let rows = stmt.query_map([], |row| {
-            Ok((
-                KnowledgeEntry {
-                    key: row.get(0)?,
-                    value: row.get(1)?,
-                    source: row.get(2)?,
-                    confidence: row.get(3)?,
-                    created_at_ms: row.get::<_, i64>(4)? as u64,
-                    last_used_ms: row.get::<_, i64>(5)? as u64,
-                    use_count: row.get::<_, i64>(6)? as u64,
-                },
-            ))
+            Ok((KnowledgeEntry {
+                key: row.get(0)?,
+                value: row.get(1)?,
+                source: row.get(2)?,
+                confidence: row.get(3)?,
+                created_at_ms: row.get::<_, i64>(4)? as u64,
+                last_used_ms: row.get::<_, i64>(5)? as u64,
+                use_count: row.get::<_, i64>(6)? as u64,
+            },))
         })?;
 
         let q_tokens: std::collections::HashSet<String> = query

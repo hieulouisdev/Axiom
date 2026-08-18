@@ -25,9 +25,17 @@ pub struct QuarantineStore {
     entries: Vec<QuarantineEntry>,
 }
 
+impl Default for QuarantineStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QuarantineStore {
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     pub fn list(&self) -> &[QuarantineEntry] {
@@ -77,7 +85,9 @@ impl QuarantineStore {
             .entries
             .iter()
             .position(|e| e.id == id)
-            .ok_or_else(|| crate::error::AegisError::Security(format!("no quarantine entry {id}")))?;
+            .ok_or_else(|| {
+                crate::error::AegisError::Security(format!("no quarantine entry {id}"))
+            })?;
         let entry = self.entries.remove(idx);
         let dest = PathBuf::from(&entry.original_path);
         if let Some(parent) = dest.parent() {
@@ -94,7 +104,9 @@ impl QuarantineStore {
             .entries
             .iter()
             .position(|e| e.id == id)
-            .ok_or_else(|| crate::error::AegisError::Security(format!("no quarantine entry {id}")))?;
+            .ok_or_else(|| {
+                crate::error::AegisError::Security(format!("no quarantine entry {id}"))
+            })?;
         let entry = self.entries.remove(idx);
         let _ = fs::remove_file(&entry.quarantined_path);
         Ok(())

@@ -29,11 +29,26 @@ use super::Severity;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum DefenseEvent {
-    Notified { threat_id: String, message: String },
-    Quarantined { threat_id: String, file_path: String },
-    Blocked { threat_id: String, pid: u32 },
-    Killed { threat_id: String, pid: u32, exit_code: Option<i32> },
-    AutoDefenseDisabled { reason: String },
+    Notified {
+        threat_id: String,
+        message: String,
+    },
+    Quarantined {
+        threat_id: String,
+        file_path: String,
+    },
+    Blocked {
+        threat_id: String,
+        pid: u32,
+    },
+    Killed {
+        threat_id: String,
+        pid: u32,
+        exit_code: Option<i32>,
+    },
+    AutoDefenseDisabled {
+        reason: String,
+    },
 }
 
 /// Channel of incoming threats from the monitor.
@@ -156,13 +171,15 @@ fn process_binary_path(pid: u32) -> Option<String> {
     #[cfg(unix)]
     {
         let path = format!("/proc/{pid}/exe");
-        std::fs::read_link(&path).ok().map(|p| p.to_string_lossy().into_owned())
+        std::fs::read_link(&path)
+            .ok()
+            .map(|p| p.to_string_lossy().into_owned())
     }
     #[cfg(not(unix))]
     {
         use windows::Win32::Foundation::CloseHandle;
         use windows::Win32::System::Threading::{
-            OpenProcess, PROCESS_NAME_FORMAT, QueryFullProcessImageNameW,
+            OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT,
             PROCESS_QUERY_LIMITED_INFORMATION,
         };
         unsafe {
@@ -179,10 +196,15 @@ fn process_binary_path(pid: u32) -> Option<String> {
                 PROCESS_NAME_FORMAT(0),
                 windows::core::PWSTR(buf.as_mut_ptr()),
                 &mut len,
-            ).is_ok();
+            )
+            .is_ok();
             let _ = CloseHandle(h);
             if ok {
-                Some(String::from_utf16_lossy(&buf[..len as usize]).trim_end_matches('\0').to_string())
+                Some(
+                    String::from_utf16_lossy(&buf[..len as usize])
+                        .trim_end_matches('\0')
+                        .to_string(),
+                )
             } else {
                 None
             }
@@ -210,7 +232,10 @@ fn kill_process(pid: u32) -> std::io::Result<()> {
         // `.ok()` converts Result -> Option, so check `.is_none()` instead
         // of `.is_err()`.
         if r.is_none() {
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "TerminateProcess failed"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "TerminateProcess failed",
+            ));
         }
         Ok(())
     }

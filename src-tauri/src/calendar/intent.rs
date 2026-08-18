@@ -53,7 +53,11 @@ pub fn classify(message: &str) -> CalendarIntent {
     let lower = message.to_lowercase();
     // Schedule-meeting check is FIRST so "schedule a meeting tomorrow" wins
     // over the tomorrow-list intent.
-    if (lower.contains("schedule") || lower.contains("plan") || lower.contains("book") || lower.contains("set up") || lower.contains("arrange"))
+    if (lower.contains("schedule")
+        || lower.contains("plan")
+        || lower.contains("book")
+        || lower.contains("set up")
+        || lower.contains("arrange"))
         && lower.contains("meeting")
     {
         return CalendarIntent::ScheduleMeeting;

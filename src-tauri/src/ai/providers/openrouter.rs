@@ -18,7 +18,12 @@ impl OpenRouterProvider {
             false,
             Some("https://openrouter.ai/api/v1"),
             "openai/gpt-4o-mini",
-            &["openai/gpt-4o", "anthropic/claude-3.5-sonnet", "google/gemini-pro-1.5", "meta-llama/llama-3.3-70b-instruct"],
+            &[
+                "openai/gpt-4o",
+                "anthropic/claude-3.5-sonnet",
+                "google/gemini-pro-1.5",
+                "meta-llama/llama-3.3-70b-instruct",
+            ],
             true,
         ))
     }

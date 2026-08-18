@@ -1,6 +1,6 @@
 //! Activity log: append-only audit trail of every computer-use action.
 
-use rusqlite::{params};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;

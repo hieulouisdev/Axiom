@@ -18,7 +18,10 @@ impl AnyscaleProvider {
             false,
             Some("https://api.endpoints.anyscale.com/v1"),
             "meta-llama/Llama-3.1-70B-Instruct",
-            &["meta-llama/Llama-3.1-70B-Instruct", "meta-llama/Llama-3.1-8B-Instruct"],
+            &[
+                "meta-llama/Llama-3.1-70B-Instruct",
+                "meta-llama/Llama-3.1-8B-Instruct",
+            ],
             true,
         ))
     }

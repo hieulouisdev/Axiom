@@ -43,7 +43,7 @@ export function Sidebar() {
   const toggleTheme = useStore((s) => s.toggleTheme);
   const collapsed = useStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useStore((s) => s.toggleSidebar);
-  const [version, setVersion] = useState<string>("0.8.0");
+  const [version, setVersion] = useState<string>("1.0.0");
 
   useEffect(() => {
     appVersion()

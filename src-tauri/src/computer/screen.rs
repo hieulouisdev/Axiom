@@ -37,10 +37,7 @@ pub fn screenshot() -> Result<Screenshot> {
     // The buffer is already PNG-encoded in screenshots 0.2.
     let png_bytes = image.buffer();
 
-    let png_base64 = base64::Engine::encode(
-        &base64::engine::general_purpose::STANDARD,
-        &png_bytes,
-    );
+    let png_base64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &png_bytes);
 
     // OCR text extraction (best-effort)
     let ocr_text = extract_ocr_text(&png_bytes).unwrap_or_default();
@@ -85,10 +82,7 @@ pub fn screenshot_area(x: i32, y: i32, width: u32, height: u32) -> Result<Screen
 /// Extract text from a PNG image using Tesseract OCR (best-effort).
 fn extract_ocr_text(png_bytes: &[u8]) -> Result<String> {
     let temp_dir = std::env::temp_dir();
-    let temp_path = temp_dir.join(format!(
-        "aegis_ocr_{}.png",
-        uuid::Uuid::new_v4().simple()
-    ));
+    let temp_path = temp_dir.join(format!("aegis_ocr_{}.png", uuid::Uuid::new_v4().simple()));
 
     std::fs::write(&temp_path, png_bytes)
         .map_err(|e| AegisError::Io(format!("temp image write: {e}")))?;

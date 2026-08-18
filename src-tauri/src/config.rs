@@ -61,18 +61,13 @@ pub struct AppConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum OperatingMode {
     /// AI is always on, listens to events, and acts proactively.
     Continuous,
     /// AI stays dormant until explicitly invoked (saves cost).
+    #[default]
     OnDemand,
-}
-
-impl Default for OperatingMode {
-    fn default() -> Self {
-        // Default to on-demand to minimize AI cost for new users.
-        OperatingMode::OnDemand
-    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -130,9 +125,15 @@ impl Default for SecurityConfig {
             scanner_enabled: true,
             quarantine_auto_delete_days: 30,
             command_whitelist: vec![
-                "ls".into(), "cat".into(), "echo".into(), "pwd".into(), "date".into(),
-                "git status".into(), "git log".into(),
-                "tasklist".into(), "systeminfo".into(),
+                "ls".into(),
+                "cat".into(),
+                "echo".into(),
+                "pwd".into(),
+                "date".into(),
+                "git status".into(),
+                "git log".into(),
+                "tasklist".into(),
+                "systeminfo".into(),
             ],
             write_path_whitelist: vec!["~/Documents/AegisAI/".into()],
             threat_signatures: ThreatSignature::default_list(),
@@ -306,7 +307,10 @@ pub fn store_credential_secure(provider_id: &str, api_key: &str) -> Result<()> {
                     Ok(())
                 }
                 Err(e) => {
-                    tracing::warn!("keychain write failed for {}: {e}, falling back to config", provider_id);
+                    tracing::warn!(
+                        "keychain write failed for {}: {e}, falling back to config",
+                        provider_id
+                    );
                     // Fallback: the caller will store in config.toml
                     Err(anyhow::anyhow!("keychain write failed: {e}"))
                 }
@@ -323,12 +327,7 @@ pub fn store_credential_secure(provider_id: &str, api_key: &str) -> Result<()> {
 /// Returns None if not found in keychain (caller should check config).
 pub fn get_credential_secure(provider_id: &str) -> Option<String> {
     match keyring::Entry::new("aegis-ai", provider_id) {
-        Ok(entry) => {
-            match entry.get_password() {
-                Ok(password) => Some(password),
-                Err(_) => None,
-            }
-        }
+        Ok(entry) => entry.get_password().ok(),
         Err(_) => None,
     }
 }
@@ -343,7 +342,10 @@ pub fn delete_credential_secure(provider_id: &str) -> Result<()> {
                     Ok(())
                 }
                 Err(e) => {
-                    tracing::debug!("keychain delete for {} failed (may not exist): {e}", provider_id);
+                    tracing::debug!(
+                        "keychain delete for {} failed (may not exist): {e}",
+                        provider_id
+                    );
                     Ok(()) // Not an error if it doesn't exist
                 }
             }

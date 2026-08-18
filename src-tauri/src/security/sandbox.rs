@@ -21,10 +21,7 @@ pub struct SandboxPolicy {
 
 impl Default for SandboxPolicy {
     fn default() -> Self {
-        let mut dirs = vec![
-            "/tmp".into(),
-            "/var/tmp".into(),
-        ];
+        let mut dirs = vec!["/tmp".into(), "/var/tmp".into()];
         dirs.extend(Self::platform_defaults());
         Self {
             enabled: true,
@@ -58,7 +55,9 @@ impl SandboxPolicy {
         } else {
             match path.parent() {
                 Some(parent) if parent.exists() => {
-                    let canon_parent = parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf());
+                    let canon_parent = parent
+                        .canonicalize()
+                        .unwrap_or_else(|_| parent.to_path_buf());
                     match path.file_name() {
                         Some(name) => canon_parent.join(name),
                         None => path.to_path_buf(),
@@ -152,9 +151,8 @@ impl SandboxPolicy {
     /// - Attempts to canonicalize (resolve symlinks / `..`).
     /// - Falls back to the raw string if resolution fails.
     fn normalize_dir(dir: &str) -> String {
-        let expanded = if dir.starts_with("~/") {
+        let expanded = if let Some(rest) = dir.strip_prefix("~/") {
             if let Some(home) = dirs::home_dir() {
-                let rest = &dir[2..];
                 home.join(rest).to_string_lossy().to_string()
             } else {
                 dir.to_string()
@@ -172,6 +170,7 @@ impl SandboxPolicy {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::field_reassign_with_default)]
     use super::*;
 
     #[test]

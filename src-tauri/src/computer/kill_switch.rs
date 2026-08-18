@@ -5,7 +5,6 @@
 //! Once tripped, the switch stays tripped until `reset()` is called. This
 //! prevents the AI from re-launching itself immediately after being stopped.
 
-use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static TRIPPED: AtomicBool = AtomicBool::new(false);

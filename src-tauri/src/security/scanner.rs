@@ -124,21 +124,20 @@ pub fn scan_with_clamav(path: &str) -> Result<ScanResult> {
     let infected = stdout.contains("FOUND");
     let signature_name = if infected {
         // Try to extract the signature name
-        stdout.lines()
-            .find_map(|line| {
-                if line.contains("FOUND") {
-                    let parts: Vec<&str> = line.split(':').collect();
-                    if parts.len() >= 2 {
-                        let sig = parts[1].trim();
-                        let sig = sig.strip_suffix("FOUND").unwrap_or(sig).trim();
-                        Some(sig.to_string())
-                    } else {
-                        None
-                    }
+        stdout.lines().find_map(|line| {
+            if line.contains("FOUND") {
+                let parts: Vec<&str> = line.split(':').collect();
+                if parts.len() >= 2 {
+                    let sig = parts[1].trim();
+                    let sig = sig.strip_suffix("FOUND").unwrap_or(sig).trim();
+                    Some(sig.to_string())
                 } else {
                     None
                 }
-            })
+            } else {
+                None
+            }
+        })
     } else {
         None
     };
@@ -180,7 +179,11 @@ fn scan_with_defender(path: &str) -> Result<ScanResult> {
                 path: path.into(),
                 scanned: true,
                 infected,
-                signature_name: if infected { Some("WindowsDefender".into()) } else { None },
+                signature_name: if infected {
+                    Some("WindowsDefender".into())
+                } else {
+                    None
+                },
                 hash_sha256: hash_hex,
                 size_bytes,
                 error: None,
@@ -189,7 +192,9 @@ fn scan_with_defender(path: &str) -> Result<ScanResult> {
         }
         Err(_) => {
             // Defender not available
-            Err(AegisError::Security("Windows Defender scan not available".into()))
+            Err(AegisError::Security(
+                "Windows Defender scan not available".into(),
+            ))
         }
     }
 }
@@ -254,7 +259,10 @@ fn load_extra_signatures() -> Result<Vec<(String, String)>> {
     let entries = std::fs::read_dir(&sig_dir)?;
     for entry in entries.flatten() {
         let path = entry.path();
-        let ext = path.extension().map(|e| e.to_string_lossy().to_string()).unwrap_or_default();
+        let ext = path
+            .extension()
+            .map(|e| e.to_string_lossy().to_string())
+            .unwrap_or_default();
         if ext == "hdb" || ext == "hsb" || ext == "hash" {
             if let Ok(content) = std::fs::read_to_string(&path) {
                 for line in content.lines() {

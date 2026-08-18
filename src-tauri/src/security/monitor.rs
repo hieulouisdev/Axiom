@@ -133,7 +133,11 @@ fn sample_processes() -> Vec<ProcessSnapshot> {
     let start = Instant::now();
     let mut out = Vec::new();
     sample_processes_inner(&mut out);
-    tracing::debug!("process sample took {}ms ({} procs)", start.elapsed().as_millis(), out.len());
+    tracing::debug!(
+        "process sample took {}ms ({} procs)",
+        start.elapsed().as_millis(),
+        out.len()
+    );
     out
 }
 
@@ -161,7 +165,11 @@ fn sample_processes_inner(out: &mut Vec<ProcessSnapshot>) {
             .unwrap_or_else(|| name_str.clone());
         let started_at_ms = std::fs::read_to_string(format!("/proc/{pid}/stat"))
             .ok()
-            .and_then(|s| s.split_whitespace().nth(21).and_then(|s| s.parse::<u64>().ok()))
+            .and_then(|s| {
+                s.split_whitespace()
+                    .nth(21)
+                    .and_then(|s| s.parse::<u64>().ok())
+            })
             .map(|ticks| ticks * 10); // USER_HZ=100 -> ms
         let parent_pid = stat
             .split_whitespace()
@@ -229,7 +237,9 @@ mod regex_lite {
 
     impl Regex {
         pub fn new(pattern: &str) -> std::result::Result<Self, ()> {
-            Ok(Self { pattern: pattern.to_string() })
+            Ok(Self {
+                pattern: pattern.to_string(),
+            })
         }
 
         pub fn is_match(&self, haystack: &str) -> bool {

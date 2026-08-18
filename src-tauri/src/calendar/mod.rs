@@ -17,5 +17,5 @@
 pub mod caldav;
 pub mod intent;
 
-pub use caldav::{CalendarClient, CalendarEvent, CalendarConfig};
+pub use caldav::{CalendarClient, CalendarConfig, CalendarEvent};
 pub use intent::{dispatch_calendar_intent, CalendarDispatchResult, CalendarIntent};

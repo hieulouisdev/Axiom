@@ -91,7 +91,13 @@ pub fn inject_default(
     query: &str,
     store: &EmbeddingStore,
 ) -> Result<usize> {
-    inject_rag_context(messages, query, store, DEFAULT_RAG_TOP_K, DEFAULT_RAG_MIN_SCORE)
+    inject_rag_context(
+        messages,
+        query,
+        store,
+        DEFAULT_RAG_TOP_K,
+        DEFAULT_RAG_MIN_SCORE,
+    )
 }
 
 #[cfg(test)]
@@ -116,10 +122,22 @@ mod tests {
     #[test]
     fn rag_injects_relevant_facts() {
         let store = open_test_store();
-        store.knowledge.remember("pet_name", "Rex", Some("user"), 0.9).unwrap();
-        store.knowledge.remember("favorite_color", "blue", Some("user"), 0.9).unwrap();
-        store.embeddings.upsert("pet_name", "pet_name Rex dog").unwrap();
-        store.embeddings.upsert("favorite_color", "favorite_color blue").unwrap();
+        store
+            .knowledge
+            .remember("pet_name", "Rex", Some("user"), 0.9)
+            .unwrap();
+        store
+            .knowledge
+            .remember("favorite_color", "blue", Some("user"), 0.9)
+            .unwrap();
+        store
+            .embeddings
+            .upsert("pet_name", "pet_name Rex dog")
+            .unwrap();
+        store
+            .embeddings
+            .upsert("favorite_color", "favorite_color blue")
+            .unwrap();
 
         let mut msgs = vec![ChatMessage::system("You are Aegis AI.")];
         let n = inject_default(&mut msgs, "what is my dog's name?", &store.embeddings).unwrap();
@@ -133,20 +151,33 @@ mod tests {
     #[test]
     fn rag_skips_below_threshold() {
         let store = open_test_store();
-        store.knowledge.remember("foo", "bar", Some("user"), 0.5).unwrap();
+        store
+            .knowledge
+            .remember("foo", "bar", Some("user"), 0.5)
+            .unwrap();
         store.embeddings.upsert("foo", "foo bar").unwrap();
         let mut msgs = vec![ChatMessage::system("hi")];
         // The query is completely unrelated; with the trigram embedding,
         // there should be very low similarity — but if our min-score is 0.99,
         // we should skip every entry.
-        let n = inject_rag_context(&mut msgs, "completely different topic", &store.embeddings, 5, 0.99).unwrap();
+        let n = inject_rag_context(
+            &mut msgs,
+            "completely different topic",
+            &store.embeddings,
+            5,
+            0.99,
+        )
+        .unwrap();
         assert_eq!(n, 0);
     }
 
     #[test]
     fn rag_inserts_system_if_missing() {
         let store = open_test_store();
-        store.knowledge.remember("name", "Alice", Some("user"), 1.0).unwrap();
+        store
+            .knowledge
+            .remember("name", "Alice", Some("user"), 1.0)
+            .unwrap();
         store.embeddings.upsert("name", "name Alice").unwrap();
         let mut msgs = vec![ChatMessage::user("what's my name?")];
         let n = inject_default(&mut msgs, "what is my name?", &store.embeddings).unwrap();

@@ -16,8 +16,8 @@
 pub mod activity;
 pub mod conversation;
 pub mod embeddings;
-pub mod entities;
 pub mod encryption;
+pub mod entities;
 pub mod knowledge;
 pub mod rag;
 pub mod store;
@@ -25,7 +25,7 @@ pub mod store;
 pub use activity::{ActivityLog, ActivityRecord};
 pub use conversation::{Conversation, ConversationStore, Message};
 pub use embeddings::EmbeddingStore;
-pub use entities::{extract_and_store, extract_from_messages, ExtractedEntity};
 pub use encryption::{status as encryption_status, EncryptionStatus};
+pub use entities::{extract_and_store, extract_from_messages, ExtractedEntity};
 pub use knowledge::{KnowledgeBase, KnowledgeEntry};
 pub use store::MemoryStore;

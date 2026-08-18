@@ -129,11 +129,13 @@ pub fn register(app: &AppHandle, manager: &Arc<HotkeyManager>) -> Result<()> {
 
     // Unregister any previous shortcut (idempotent).
     if manager.is_registered() {
-        let _ = app.global_shortcut().unregister(shortcut.clone());
+        let _ = app.global_shortcut().unregister(shortcut);
     }
     app.global_shortcut()
         .on_shortcut(shortcut, handler)
-        .map_err(|e| AegisError::Config(format!("failed to register hotkey '{hotkey_str}': {e}")))?;
+        .map_err(|e| {
+            AegisError::Config(format!("failed to register hotkey '{hotkey_str}': {e}"))
+        })?;
     *manager.registered.lock() = true;
     tracing::info!("push-to-talk hotkey registered: {hotkey_str}");
     Ok(())

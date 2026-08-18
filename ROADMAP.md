@@ -1,6 +1,6 @@
 # Aegis AI — Development Roadmap
 
-Current release: **v0.9.0**. The project follows a 4-phase plan.
+Current release: **v1.0.0** (General Availability). The project follows a 4-phase plan.
 
 ---
 
@@ -52,10 +52,10 @@ Computer-use agent, RAG, embeddings, knowledge base.
 
 - [x] Agent loop (function-calling, iteration cap, kill switch)
 - [x] 14 AI tools (shell, file I/O, apps, screenshot, clipboard, http, web)
-- [x] Character-trigram hash embeddings
+- [x] Character-trigram hash embeddings (extended with word-unigram features in v1.0)
 - [x] Knowledge base with semantic search
-- [x] Entity extraction
-- [ ] Neural embeddings (`all-MiniLM-L6-v2` via `ort`) — *planned v1.0*
+- [x] Entity extraction (case-sensitive capture fixed in v1.0)
+- [ ] Neural embeddings (`all-MiniLM-L6-v2` via `ort`) — *planned v1.1*
 - [ ] YARA rule scanning — *partially implemented*
 
 ---
@@ -72,14 +72,23 @@ Provider catalog, fast-path HTTP, skills, voice, bypass mode, i18n completion.
 - [x] Voice I/O (push-to-talk, Whisper STT, OS-native/ElevenLabs TTS)
 - [x] Bypass Mode (user-controlled, hard-deny list always enforced)
 - [x] +14 tools (total 28): git, process, code_eval, memory, skill_set, …
-- [x] CalDAV calendar integration
+- [x] CalDAV calendar integration (with correct RFC 5545 line unfolding in v1.0)
 - [x] 7-locale i18n (EN, VI, ES, FR, DE, JA, ZH-CN)
 - [x] Bug sweep: Actions workflow, locale expansion, boot panic, quarantine panel, XSS
 - [x] Documentation rewrite for professional presentation
 
 ---
 
-## Next: v1.0 — Production Release
+## v1.0.0 — General Availability ✅
+
+Comprehensive bug-fix & polish sweep: 18 hard compile errors fixed across
+the Rust backend, 30+ clippy warnings cleaned up, 4 failing unit tests
+fixed (104/104 now pass), GitHub Actions workflows corrected, version
+bumped to 1.0.0 across all manifests. See CHANGELOG.md for the full list.
+
+---
+
+## Next: v1.1 — Hardening & macOS
 
 | Task | Priority |
 |---|---|
@@ -87,9 +96,11 @@ Provider catalog, fast-path HTTP, skills, voice, bypass mode, i18n completion.
 | Neural embeddings (all-MiniLM-L6-v2) | High |
 | Signed confirmation tokens | High |
 | OS keychain for all credentials | High |
+| AWS Bedrock SigV4 signing (currently stubbed) | High |
 | Credential zeroization (`zeroize` crate) | Medium |
 | Auto-update with signed manifest | Medium |
 | `aegis export` / `aegis forget` CLI commands | Medium |
 | macOS support | Medium |
 | Fuzz targets for IPC parser + safety evaluator | Low |
 | Reproducible builds + binary signing | Low |
+

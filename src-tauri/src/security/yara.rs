@@ -81,15 +81,15 @@ pub fn parse_rules(text: &str, source: &PathBuf) -> Vec<YaraRule> {
 
     let mut out = Vec::new();
     for cap in header_re.captures_iter(text) {
-        let name = cap.name("name").map(|m| m.as_str().to_string()).unwrap_or_default();
+        let name = cap
+            .name("name")
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
         if name.is_empty() {
             continue;
         }
         let tags_str = cap.name("tags").map(|m| m.as_str()).unwrap_or("");
-        let tags: Vec<String> = tags_str
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect();
+        let tags: Vec<String> = tags_str.split_whitespace().map(|s| s.to_string()).collect();
         // Find the rule body — from the end of this header match to the
         // next `rule ` line or end of file.
         let body_start = cap.get(0).map(|m| m.end()).unwrap_or(0);
@@ -133,8 +133,10 @@ pub fn scan_file(rules: &[YaraRule], content: &[u8]) -> Vec<String> {
 fn yara_header_re() -> &'static Regex {
     static R: OnceLock<Regex> = OnceLock::new();
     R.get_or_init(|| {
-        Regex::new(r"(?m)^rule\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*(?P<tags>[^\n{]+))?\s*\{")
-            .unwrap()
+        Regex::new(
+            r"(?m)^rule\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*(?P<tags>[^\n{]+))?\s*\{",
+        )
+        .unwrap()
     })
 }
 

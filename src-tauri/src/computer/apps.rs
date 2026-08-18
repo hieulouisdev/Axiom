@@ -69,7 +69,7 @@ pub fn list_apps() -> Vec<AppDescriptor> {
     let known = known_apps();
     known
         .into_iter()
-        .filter(|a| {
+        .filter(|_a| {
             // For now, include everything; Phase 3 will check `which` / start-menu.
             true
         })
@@ -82,11 +82,41 @@ fn known_apps() -> Vec<AppDescriptor> {
     #[cfg(unix)]
     {
         let names = [
-            "firefox", "chromium", "google-chrome", "brave", "code", "subl", "vim",
-            "emacs", "git", "htop", "vlc", "spotify", "discord", "slack", "telegram-desktop",
-            "thunderbird", "libreoffice", "gimp", "inkscape", "blender", "audacity",
-            "files", "nautilus", "thunar", "dolphin", "tilix", "gnome-terminal", "konsole",
-            "xterm", "alacritty", "kitty", "wezterm", "tmux", "btop", "nvidia-smi",
+            "firefox",
+            "chromium",
+            "google-chrome",
+            "brave",
+            "code",
+            "subl",
+            "vim",
+            "emacs",
+            "git",
+            "htop",
+            "vlc",
+            "spotify",
+            "discord",
+            "slack",
+            "telegram-desktop",
+            "thunderbird",
+            "libreoffice",
+            "gimp",
+            "inkscape",
+            "blender",
+            "audacity",
+            "files",
+            "nautilus",
+            "thunar",
+            "dolphin",
+            "tilix",
+            "gnome-terminal",
+            "konsole",
+            "xterm",
+            "alacritty",
+            "kitty",
+            "wezterm",
+            "tmux",
+            "btop",
+            "nvidia-smi",
         ];
         for n in names {
             out.push(AppDescriptor {
@@ -100,10 +130,34 @@ fn known_apps() -> Vec<AppDescriptor> {
     #[cfg(not(unix))]
     {
         let names = [
-            "chrome", "msedge", "firefox", "brave", "code", "notepad++", "vim",
-            "git", "explorer", "vlc", "spotify", "discord", "slack", "telegram",
-            "outlook", "winword", "excel", "powerpnt", "gimp", "inkscape", "blender",
-            "audacity", "cmd", "powershell", "pwsh", "wt", "taskmgr", "regedit",
+            "chrome",
+            "msedge",
+            "firefox",
+            "brave",
+            "code",
+            "notepad++",
+            "vim",
+            "git",
+            "explorer",
+            "vlc",
+            "spotify",
+            "discord",
+            "slack",
+            "telegram",
+            "outlook",
+            "winword",
+            "excel",
+            "powerpnt",
+            "gimp",
+            "inkscape",
+            "blender",
+            "audacity",
+            "cmd",
+            "powershell",
+            "pwsh",
+            "wt",
+            "taskmgr",
+            "regedit",
         ];
         for n in names {
             out.push(AppDescriptor {
@@ -131,7 +185,13 @@ fn which(name: &str) -> Option<String> {
 fn which(name: &str) -> Option<String> {
     let output = Command::new("where").arg(name).output().ok()?;
     if output.status.success() {
-        Some(String::from_utf8_lossy(&output.stdout).lines().next().unwrap_or("").to_string())
+        Some(
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .next()
+                .unwrap_or("")
+                .to_string(),
+        )
     } else {
         None
     }

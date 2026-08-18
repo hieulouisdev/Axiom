@@ -71,7 +71,8 @@ fn perform_one(enigo: &mut enigo::Enigo, action: &AutoAction) -> Result<()> {
 }
 
 fn mouse_move(enigo: &mut enigo::Enigo, x: i32, y: i32) -> Result<()> {
-    enigo.move_mouse(x, y, enigo::Coordinate::Abs)
+    enigo
+        .move_mouse(x, y, enigo::Coordinate::Abs)
         .map_err(|e| AegisError::Internal(format!("mouse_move: {e}")))?;
     tracing::debug!("mouse_move -> ({}, {})", x, y);
     Ok(())
@@ -79,7 +80,8 @@ fn mouse_move(enigo: &mut enigo::Enigo, x: i32, y: i32) -> Result<()> {
 
 fn mouse_click(enigo: &mut enigo::Enigo, x: i32, y: i32, button: &MouseButton) -> Result<()> {
     // Move to position first
-    enigo.move_mouse(x, y, enigo::Coordinate::Abs)
+    enigo
+        .move_mouse(x, y, enigo::Coordinate::Abs)
         .map_err(|e| AegisError::Internal(format!("mouse_move: {e}")))?;
 
     let enigo_button = match button {
@@ -88,9 +90,11 @@ fn mouse_click(enigo: &mut enigo::Enigo, x: i32, y: i32, button: &MouseButton) -
         MouseButton::Middle => enigo::Button::Middle,
     };
 
-    enigo.button(enigo_button, enigo::Direction::Press)
+    enigo
+        .button(enigo_button, enigo::Direction::Press)
         .map_err(|e| AegisError::Internal(format!("mouse_press: {e}")))?;
-    enigo.button(enigo_button, enigo::Direction::Release)
+    enigo
+        .button(enigo_button, enigo::Direction::Release)
         .map_err(|e| AegisError::Internal(format!("mouse_release: {e}")))?;
 
     tracing::debug!("mouse_click at ({}, {}) {:?}", x, y, button);
@@ -98,7 +102,8 @@ fn mouse_click(enigo: &mut enigo::Enigo, x: i32, y: i32, button: &MouseButton) -
 }
 
 fn type_text(enigo: &mut enigo::Enigo, text: &str) -> Result<()> {
-    enigo.text(text)
+    enigo
+        .text(text)
         .map_err(|e| AegisError::Internal(format!("type_text: {e}")))?;
     tracing::debug!("type_text -> {} chars", text.chars().count());
     Ok(())
@@ -119,25 +124,30 @@ fn press_key(enigo: &mut enigo::Enigo, combo: &str) -> Result<()> {
     // Press modifiers
     let mod_keys: Vec<Key> = modifiers.iter().filter_map(|m| parse_modifier(m)).collect();
     for mk in &mod_keys {
-        enigo.key(*mk, enigo::Direction::Press)
+        enigo
+            .key(*mk, enigo::Direction::Press)
             .map_err(|e| AegisError::Internal(format!("key_press modifier: {e}")))?;
     }
 
     // Press and release the main key
     if let Some(key) = parse_key(key_str) {
-        enigo.key(key, enigo::Direction::Press)
+        enigo
+            .key(key, enigo::Direction::Press)
             .map_err(|e| AegisError::Internal(format!("key_press: {e}")))?;
-        enigo.key(key, enigo::Direction::Release)
+        enigo
+            .key(key, enigo::Direction::Release)
             .map_err(|e| AegisError::Internal(format!("key_release: {e}")))?;
     } else {
         // If we can't parse the key, try typing it as text
-        enigo.text(key_str)
+        enigo
+            .text(key_str)
             .map_err(|e| AegisError::Internal(format!("key_text: {e}")))?;
     }
 
     // Release modifiers in reverse order
     for mk in mod_keys.iter().rev() {
-        enigo.key(*mk, enigo::Direction::Release)
+        enigo
+            .key(*mk, enigo::Direction::Release)
             .map_err(|e| AegisError::Internal(format!("key_release modifier: {e}")))?;
     }
 
@@ -147,11 +157,13 @@ fn press_key(enigo: &mut enigo::Enigo, combo: &str) -> Result<()> {
 
 fn mouse_scroll(enigo: &mut enigo::Enigo, x: i32, y: i32, delta: i32) -> Result<()> {
     // Move to position first
-    enigo.move_mouse(x, y, enigo::Coordinate::Abs)
+    enigo
+        .move_mouse(x, y, enigo::Coordinate::Abs)
         .map_err(|e| AegisError::Internal(format!("mouse_move: {e}")))?;
 
     // enigo 0.2: `scroll(length, axis)` — positive = down/right, negative = up/left.
-    enigo.scroll(delta, enigo::Axis::Vertical)
+    enigo
+        .scroll(delta, enigo::Axis::Vertical)
         .map_err(|e| AegisError::Internal(format!("mouse_scroll: {e}")))?;
 
     tracing::debug!("mouse_scroll at ({}, {}) delta={}", x, y, delta);

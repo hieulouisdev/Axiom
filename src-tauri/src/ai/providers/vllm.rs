@@ -18,7 +18,10 @@ impl VllmProvider {
             true,
             Some("http://localhost:8000/v1"),
             "meta-llama/Llama-3.2-1B-Instruct",
-            &["meta-llama/Llama-3.2-1B-Instruct", "Qwen/Qwen2.5-7B-Instruct"],
+            &[
+                "meta-llama/Llama-3.2-1B-Instruct",
+                "Qwen/Qwen2.5-7B-Instruct",
+            ],
             true,
         ))
     }

@@ -21,7 +21,7 @@ pub async fn start(state: Arc<Mutex<AppState>>) {
         interval.tick().await;
         // Check if there's a pending wake request.
         let wake = {
-            let s = state.lock();
+            let _s = state.lock();
             // For v0.1, we just check whether any critical security events
             // occurred in the last 30s. Phase 3 will use a proper channel.
             false

@@ -100,7 +100,9 @@ impl Provider for AnthropicProvider {
                     system_text.push_str(&m.content);
                 }
                 Role::User => user_messages.push(json!({"role": "user", "content": m.content})),
-                Role::Assistant => user_messages.push(json!({"role": "assistant", "content": m.content})),
+                Role::Assistant => {
+                    user_messages.push(json!({"role": "assistant", "content": m.content}))
+                }
                 Role::Tool => user_messages.push(json!({"role": "user", "content": m.content})),
             }
         }
@@ -128,7 +130,9 @@ impl Provider for AnthropicProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(AegisError::Ai(format!("HTTP {status} from anthropic: {text}")));
+            return Err(AegisError::Ai(format!(
+                "HTTP {status} from anthropic: {text}"
+            )));
         }
 
         let body: serde_json::Value = resp.json().await?;

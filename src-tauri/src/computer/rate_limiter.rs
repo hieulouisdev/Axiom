@@ -8,8 +8,7 @@
 //! This is intentional: even with multiple concurrent conversations, the
 //! aggregate rate stays bounded.
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use parking_lot::Mutex;
 
