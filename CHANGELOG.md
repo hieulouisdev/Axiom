@@ -4,6 +4,89 @@ All notable changes to Aegis AI are documented in this file. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-08-18 — Bug-sweep & i18n completion
+
+### Fixed — Critical
+
+- **GitHub Actions workflow** (`build-release.yml`): the `on.push.branches`
+  and `on.pull_request.branches` keys were a malformed YAML literal
+  (`branches: ain]`) that silently disabled the whole pipeline. Rewritten
+  to `branches: [main]` and the per-OS job matrix was aligned with the
+  `release.yml` workflow (correct target path
+  `src-tauri/target/<triple>/release/bundle`, Linux deps cached via
+  `actions/cache@v4`, fmt+clippy run as informational lint gates).
+- **i18n Locale expansion**: v0.7 claimed "5 new languages added" but
+  the backend `Locale` enum still only had `En, Vi`, so picking any of
+  `es / fr / de / ja / zh-CN` silently fell back to English on the
+  backend and was narrowed back to `en`/`vi` by `App.tsx` and
+  `Settings.tsx` on the frontend. The full 7-locale pipeline now works
+  end-to-end:
+  - `src-tauri/src/i18n/mod.rs`: `Locale` enum expanded to 7 variants
+    (`En`, `Vi`, `Es`, `Fr`, `De`, `Ja`, `ZhCn`); `from_code` accepts
+    BCP-47 codes incl. `zh-CN` / `zh_cn` / `zh-Hans`; `code()` round-trips.
+  - `src/i18n/index.ts` exports `SUPPORTED_LOCALES` and `LOCALE_LABELS`.
+  - `App.tsx` validates persisted language against `SUPPORTED_LOCALES`
+    instead of hard-narrowing to `en`/`vi`.
+  - `Settings.tsx` language picker now renders all 7 locales (English,
+    Tiếng Việt, Español, Français, Deutsch, 日本語, 简体中文) and `save()`
+    calls `i18nSetLocale()` so the backend stays in sync.
+- **`state.rs` boot-time panic**: the in-memory SQLite fallback was
+  `unwrap_or_else(|e| { log; open_in_memory().expect(...) })` which would
+  re-panic on the second attempt. Reworked to use `match` with a clear
+  `tracing::error!` log and a single retry. The retry still panics if
+  SQLite itself is broken (extremely unlikely) — that's a true fatal
+  error worth surfacing.
+- **Markdown XSS**: link renderer in `Markdown.tsx` accepted any `href`
+  scheme, including `javascript:` and `data:`. Now restricted to
+  `http(s)` only; other schemes are rewritten to `#`.
+
+### Fixed — High
+
+- **Quarantine panel** (`Security.tsx`): was a hardcoded "Phase 2:
+  placeholder" even though `security_quarantine_list` and
+  `security_restore_file` were fully wired end-to-end. The panel now
+  loads the live quarantine list, shows original path + reason, and
+  exposes a one-click Restore button.
+- **Sidebar version** (`Sidebar.tsx`): hardcoded `"0.7.0"` initial state
+  caused a stale version badge before `appVersion()` resolved. Bumped
+  default to `"0.8.0"` and the `useEffect` now safely no-ops in dev
+  mode without Tauri.
+- **Chat error bubble** (`Chat.tsx`): always labeled "No AI provider
+  configured" regardless of the actual error. Now shows the real error
+  message via `t("common.error")`. Also replaced array-index React keys
+  with stable `${role}-${i}-${content.length}` keys.
+- **`Settings.tsx` save()** was missing the `i18nSetLocale()` call, so
+  backend locale never synced after a Settings change. Added with a
+  try/catch so dev mode (no Tauri) doesn't break.
+- **Backend i18n missing keys**: added `nav.web`, `nav.guide`,
+  `nav.theme.toggle`, `nav.sidebar.toggle`, `chat.empty.feature*`,
+  `chat.copy`, `chat.copied`, `chat.regenerate`, `settings.bypass_mode`,
+  `settings.theme.*`, `settings.data.*`, `settings.encryption.*`,
+  `settings.sandbox.*`, `settings.telemetry.*`, `security.quarantine.*`,
+  `security.integrity`, `security.network_scan`, `security.threats.recent`
+  and a few more — closes ~20 keys that previously round-tripped as
+  bare key strings on the backend.
+
+### Changed
+
+- Bumped version `0.7.0 → 0.8.0` across `package.json`,
+  `Cargo.toml` workspace, `src-tauri/tauri.conf.json`, and the
+  `Sidebar.tsx` default version.
+- `build-release.yml` now matches `release.yml`'s matrix shape: Linux
+  runs on `ubuntu-22.04` with full system-deps list, both runners cache
+  the Cargo registry/target via `actions/cache@v4`, and checksums are
+  uploaded as artifacts (`checksums-linux`, `checksums-windows`).
+
+### Notes
+
+- The Rust backend requires Linux system packages
+  (`libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev
+  libxdo-dev tesseract-ocr patchelf`) that are out of scope for a
+  rootless dev shell. Local validation was limited to `tsc --noEmit` +
+  `vite build` (frontend) and `cargo fmt`/visual review (backend).
+  Full `cargo check` is enforced by the `Build & Release` GitHub
+  Actions workflow on every push.
+
 ## [0.7.0] — 2026-08-18 — Phase 4: Hardening & Distribution
 
 ### Added

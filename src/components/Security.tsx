@@ -9,16 +9,28 @@ import {
   Lock,
   FileSearch,
   FolderOpen,
+  RotateCcw,
 } from "lucide-react";
 import { t } from "../i18n";
 import {
   securityStatus,
   securityScan,
   securitySetAutoDefense,
+  securityQuarantineList,
+  securityRestoreFile,
   yaraList,
   yaraEnsureDir,
 } from "../lib/tauri";
 import type { SecurityStatus as SecurityStatusDto, Threat, YaraRule } from "../types";
+
+// v0.8: a quarantined file as returned by `security_quarantine_list`.
+interface QuarantineEntry {
+  id: string;
+  original_path: string;
+  quarantined_path: string;
+  timestamp_ms: number;
+  reason: string;
+}
 
 export function Security() {
   const [status, setStatus] = useState<SecurityStatusDto | null>(null);
@@ -28,6 +40,8 @@ export function Security() {
   const [scanResults, setScanResults] = useState<{ total: number; infected: number } | null>(null);
   const [yaraRules, setYaraRules] = useState<YaraRule[]>([]);
   const [yaraLoading, setYaraLoading] = useState(false);
+  const [quarantine, setQuarantine] = useState<QuarantineEntry[]>([]);
+  const [quarantineLoading, setQuarantineLoading] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -35,6 +49,30 @@ export function Security() {
       setStatus(await securityStatus());
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshQuarantine = async () => {
+    setQuarantineLoading(true);
+    try {
+      const list = await securityQuarantineList();
+      // Backend returns a generic unknown; coerce into the typed shape.
+      const entries = Array.isArray(list) ? (list as QuarantineEntry[]) : [];
+      setQuarantine(entries);
+    } catch {
+      // Backend not ready in dev mode — show empty list.
+      setQuarantine([]);
+    } finally {
+      setQuarantineLoading(false);
+    }
+  };
+
+  const restoreQuarantined = async (id: string) => {
+    try {
+      await securityRestoreFile(id);
+      await refreshQuarantine();
+    } catch (e) {
+      alert(`Restore failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -52,6 +90,7 @@ export function Security() {
   useEffect(() => {
     refresh();
     refreshYara();
+    refreshQuarantine();
     const id = setInterval(refresh, 5000);
     return () => clearInterval(id);
   }, []);
@@ -239,13 +278,62 @@ export function Security() {
               </div>
 
               <div className="aegis-card p-4">
-                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-aegis-900 dark:text-aegis-100">
-                  <Lock className="h-4 w-4 text-aegis-accent" />
-                  {t("security.quarantine")}
-                </h3>
-                <p className="text-xs text-aegis-400 dark:text-aegis-500 px-1">
-                  Quarantined files appear here. (Phase 2: full integration with auto-defense.)
-                </p>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold flex items-center gap-2 text-aegis-900 dark:text-aegis-100">
+                    <Lock className="h-4 w-4 text-aegis-accent" />
+                    {t("security.quarantine")}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={refreshQuarantine}
+                    disabled={quarantineLoading}
+                    className="text-xs text-aegis-500 hover:text-aegis-700 dark:text-aegis-400 dark:hover:text-aegis-200 flex items-center gap-1"
+                    title="Refresh quarantine"
+                  >
+                    {quarantineLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-3 w-3" />
+                    )}
+                    Refresh
+                  </button>
+                </div>
+                {quarantine.length === 0 ? (
+                  <div className="flex flex-col items-center py-6 text-center">
+                    <ShieldCheck className="h-8 w-8 text-emerald-500 mb-2" />
+                    <p className="text-xs text-aegis-500 dark:text-aegis-400">
+                      {t("security.quarantine.empty")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {quarantine.map((q) => (
+                      <div
+                        key={q.id}
+                        className="px-3 py-2 rounded-lg bg-aegis-50 dark:bg-aegis-night-300 border border-aegis-200 dark:border-aegis-night-50"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-aegis-800 dark:text-aegis-200 truncate">
+                              {q.original_path || q.quarantined_path}
+                            </div>
+                            <div className="text-[11px] text-aegis-500 dark:text-aegis-400 mt-0.5 truncate">
+                              {q.reason}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => restoreQuarantined(q.id)}
+                            className="text-[11px] px-2 py-1 rounded-md bg-aegis-accent/10 text-aegis-accent hover:bg-aegis-accent/20 transition-colors"
+                            title={t("security.quarantine.restore")}
+                          >
+                            {t("security.quarantine.restore")}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </>

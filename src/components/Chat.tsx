@@ -130,7 +130,7 @@ export function Chat() {
         ...m,
         {
           role: "assistant",
-          content: `⚠️ ${t("chat.error_no_provider")}\n\nTechnical detail: ${msg}`,
+          content: `⚠️ ${t("common.error")}: ${msg}`,
         },
       ]);
       setLoading(false);
@@ -184,7 +184,10 @@ export function Chat() {
         ) : (
           <div className="max-w-3xl mx-auto space-y-4">
             {messages.map((m, i) => (
-              <Bubble key={i} message={m} />
+              <Bubble
+                key={`${m.role}-${i}-${m.content.length}`}
+                message={m}
+              />
             ))}
             {loading && !streaming && (
               <div className="flex items-center gap-2 text-sm text-aegis-500 dark:text-aegis-400 px-2">

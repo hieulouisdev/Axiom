@@ -165,17 +165,24 @@ function renderInline(text: string): ReactNode[] {
     },
     {
       re: /\[([^\]]+)\]\(([^)]+)\)/,
-      render: (m) => (
-        <a
-          key={key++}
-          href={m[2]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-aegis-accent hover:underline"
-        >
-          {m[1]}
-        </a>
-      ),
+      render: (m) => {
+        const rawHref = m[2];
+        // v0.8 fix: allow only http(s) links. Rejects javascript:, data:,
+        // file:, vbscript:, and other dangerous schemes — closes an XSS
+        // vector when AI output is rendered into clickable links.
+        const safeHref = /^https?:\/\//i.test(rawHref) ? rawHref : "#";
+        return (
+          <a
+            key={key++}
+            href={safeHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-aegis-accent hover:underline"
+          >
+            {m[1]}
+          </a>
+        );
+      },
     },
   ];
 

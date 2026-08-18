@@ -3,6 +3,20 @@
 // re-export it so callers (e.g. store/index.ts) can `import { Locale }`.
 export type Locale = "en" | "vi" | "es" | "fr" | "de" | "ja" | "zh-CN";
 
+// v0.8: registry of every supported locale + display name. Used by App.tsx
+// (validate persisted language) and Settings.tsx (language picker).
+export const SUPPORTED_LOCALES: Locale[] = ["en", "vi", "es", "fr", "de", "ja", "zh-CN"];
+
+export const LOCALE_LABELS: Record<Locale, string> = {
+  en: "English",
+  vi: "Tiếng Việt",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+  ja: "日本語",
+  "zh-CN": "简体中文",
+};
+
 const en: Record<string, string> = {
   "app.name": "Aegis AI",
   "app.tagline": "Secure cross-platform AI assistant",

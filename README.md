@@ -5,14 +5,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.97.1-orange.svg)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-orange.svg)](https://tauri.app)
-[![Phase](https://img.shields.io/badge/Phase-3.3%20(v0.7)-green.svg)](ROADMAP.md)
+[![Phase](https://img.shields.io/badge/Phase-4%20(v0.8)-green.svg)](ROADMAP.md)
 
-> **Current release:** v0.7 — Phase 3 continues. Adds **Voice I/O** (cloud
-> Whisper STT + OS-native TTS + Ctrl+Space push-to-talk hotkey), **Vector-
-> embedding RAG** (every chat now pulls the top-5 most similar stored facts
-> into the system prompt automatically), and **CalDAV calendar integration**
-> (read-only Nextcloud/Radicale/Synology client + intent classifier for
-> "what's on my calendar today?" / "schedule a meeting with…"). See the
+> **Current release:** v0.8 — Bug-sweep & i18n completion. Closes a
+> broken GitHub Actions workflow, expands the backend `Locale` enum to
+> match the frontend's 7 locales (EN/VI/ES/FR/DE/JA/ZH-CN) so language
+> switching actually works end-to-end, fixes a boot-time panic in
+> `state.rs`, restores the quarantine panel in the Security view, and
+> closes a markdown link XSS vector. See the
 > [Roadmap](ROADMAP.md) and [Changelog](CHANGELOG.md) for details.
 
 ## What is Aegis AI?

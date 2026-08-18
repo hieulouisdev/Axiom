@@ -1,7 +1,14 @@
-//! Internationalization: English (default) and Vietnamese.
+//! Internationalization: 7 supported locales.
 //!
-//! v0.1 uses a static translation table. Phase 2 will switch to
-//! `fluent-bundle` for proper pluralization and gender rules.
+//! v0.8: expanded to 7 languages (English, Vietnamese, Spanish, French,
+//! German, Japanese, Simplified Chinese). The backend table holds only
+//! English + Vietnamese translations; the frontend ships its own complete
+//! 7-locale table in `src/i18n/index.ts`. For locales without a backend
+//! translation, the backend falls back to English so server-side strings
+//! (alerts, notifications, audit log entries) always render correctly.
+//!
+//! Future versions may migrate to `fluent-bundle` for proper pluralization
+//! and gender rules.
 
 use std::collections::HashMap;
 
@@ -9,16 +16,32 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
+/// Supported UI locales.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Locale {
     En,
     Vi,
+    Es,
+    Fr,
+    De,
+    Ja,
+    ZhCn,
 }
 
 impl Locale {
+    /// Parse a BCP-47-style code (`en`, `vi`, `zh-CN`, …) into a `Locale`.
+    /// Defaults to `En` for unknown codes.
     pub fn from_code(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "vi" | "vn" | "vi-vn" | "vi_vn" => Locale::Vi,
+        let norm = s.trim().to_lowercase();
+        // Normalize zh-cn / zh_cn / zh-cn → zh-cn
+        let norm = norm.replace('_', "-");
+        match norm.as_str() {
+            "vi" | "vn" | "vi-vn" | "vi-vi" => Locale::Vi,
+            "es" | "es-es" | "es-419" => Locale::Es,
+            "fr" | "fr-fr" | "fr-ca" => Locale::Fr,
+            "de" | "de-de" | "de-at" | "de-ch" => Locale::De,
+            "ja" | "ja-jp" | "jp" => Locale::Ja,
+            "zh-cn" | "zh" | "zh-hans" | "zh-sg" => Locale::ZhCn,
             _ => Locale::En,
         }
     }
@@ -27,11 +50,26 @@ impl Locale {
         match self {
             Locale::En => "en",
             Locale::Vi => "vi",
+            Locale::Es => "es",
+            Locale::Fr => "fr",
+            Locale::De => "de",
+            Locale::Ja => "ja",
+            Locale::ZhCn => "zh-CN",
         }
+    }
+
+    /// Whether the backend ships a full translation table for this locale.
+    /// Locales that return `false` will fall back to English in `t()` /
+    /// `all_for_locale()`.
+    pub fn has_backend_table(&self) -> bool {
+        matches!(self, Locale::En | Locale::Vi)
     }
 }
 
 /// Translation key → (English, Vietnamese).
+/// For locales without a backend translation, the frontend ships its own
+/// complete table; the backend `t()` here always returns the English or
+/// Vietnamese string.
 static TABLE: Lazy<HashMap<&'static str, (&'static str, &'static str)>> = Lazy::new(|| {
     [
         // App
@@ -44,6 +82,10 @@ static TABLE: Lazy<HashMap<&'static str, (&'static str, &'static str)>> = Lazy::
         ("nav.security", ("Security", "Bảo mật")),
         ("nav.settings", ("Settings", "Cài đặt")),
         ("nav.modes", ("Modes", "Chế độ")),
+        ("nav.web", ("Web Search", "Tìm kiếm web")),
+        ("nav.guide", ("User Guide", "Hướng dẫn sử dụng")),
+        ("nav.theme.toggle", ("Toggle theme", "Đổi giao diện")),
+        ("nav.sidebar.toggle", ("Toggle sidebar", "Ẩn/hiện thanh bên")),
         // Chat
         ("chat.placeholder", ("Type a message…", "Nhập tin nhắn…")),
         ("chat.send", ("Send", "Gửi")),
@@ -51,8 +93,14 @@ static TABLE: Lazy<HashMap<&'static str, (&'static str, &'static str)>> = Lazy::
         ("chat.clear", ("Clear", "Xóa")),
         ("chat.empty.title", ("No messages yet", "Chưa có tin nhắn")),
         ("chat.empty.subtitle", ("Start a conversation to begin.", "Bắt đầu trò chuyện để khởi tạo.")),
+        ("chat.empty.feature1", ("Search the web in real time", "Tìm kiếm web theo thời gian thực")),
+        ("chat.empty.feature2", ("Remember facts about you automatically", "Tự động ghi nhớ thông tin về bạn")),
+        ("chat.empty.feature3", ("Run shell commands safely", "Chạy lệnh shell an toàn")),
         ("chat.thinking", ("Thinking…", "Đang suy nghĩ…")),
         ("chat.error_no_provider", ("No AI provider configured. Go to Settings → Providers to add one.", "Chưa có nhà cung cấp AI. Vào Cài đặt → Providers để thêm.")),
+        ("chat.copy", ("Copy", "Sao chép")),
+        ("chat.copied", ("Copied!", "Đã sao chép!")),
+        ("chat.regenerate", ("Regenerate", "Tạo lại")),
         // Settings
         ("settings.title", ("Settings", "Cài đặt")),
         ("settings.language", ("Language", "Ngôn ngữ")),
@@ -61,6 +109,32 @@ static TABLE: Lazy<HashMap<&'static str, (&'static str, &'static str)>> = Lazy::
         ("settings.mode.ondemand", ("On-demand (saves cost)", "Khi được gọi (tiết kiệm chi phí)")),
         ("settings.allow_autonomous", ("Allow AI to act without asking", "Cho phép AI tự hành động không cần hỏi")),
         ("settings.allow_autonomous.hint", ("Dangerous: skips safety confirmation. Use only with trusted providers.", "Nguy hiểm: bỏ qua xác nhận an toàn. Chỉ dùng với provider tin cậy.")),
+        ("settings.bypass_mode", ("Bypass Mode (advanced)", "Chế độ Bypass (nâng cao)")),
+        ("settings.bypass_mode.hint", ("Skip confirmation for medium/high-risk actions except an irrevocable hard-deny list.", "Bỏ qua xác nhận cho hành động rủi ro trung bình/cao trừ danh sách chặn cứng.")),
+        ("settings.theme", ("Theme", "Giao diện")),
+        ("settings.theme.light", ("Light", "Sáng")),
+        ("settings.theme.dark", ("Dark", "Tối")),
+        ("settings.data_privacy", ("Data & Privacy", "Dữ liệu & Quyền riêng tư")),
+        ("settings.data.export", ("Export all data (JSON)", "Xuất toàn bộ dữ liệu (JSON)")),
+        ("settings.data.forget", ("Forget all data", "Xóa toàn bộ dữ liệu")),
+        ("settings.data.forget.confirm", ("This permanently deletes all conversations, knowledge, and audit logs. Continue?", "Thao tác này xóa vĩnh viễn mọi cuộc trò chuyện, kiến thức và nhật ký kiểm toán. Tiếp tục?")),
+        ("settings.encryption", ("Database encryption", "Mã hóa cơ sở dữ liệu")),
+        ("settings.encryption.enabled", ("Encrypted at rest (SQLCipher).", "Đã mã hóa khi lưu (SQLCipher).")),
+        ("settings.encryption.disabled", ("Not encrypted. Database is stored in plaintext on disk.", "Chưa mã hóa. Cơ sở dữ liệu lưu dạng văn bản rõ.")),
+        ("settings.encryption.not_supported", ("Encryption is not supported on this platform.", "Mã hóa không được hỗ trợ trên nền tảng này.")),
+        ("settings.sandbox", ("AI Sandbox", "Hộp cát AI")),
+        ("settings.sandbox.hint", ("Restrict where the AI can write files on your machine.", "Giới hạn vị trí AI có thể ghi tệp.")),
+        ("settings.sandbox.enabled", ("Sandbox enabled", "Bật hộp cát")),
+        ("settings.sandbox.allowed_dirs", ("Allowed directories", "Thư mục được phép")),
+        ("settings.sandbox.add_dir", ("Add directory", "Thêm thư mục")),
+        ("settings.sandbox.remove", ("Remove", "Xóa")),
+        ("settings.sandbox.empty", ("No extra directories allowed.", "Không có thư mục bổ sung nào được phép.")),
+        ("settings.telemetry", ("Anonymous Telemetry", "Telemetry ẩn danh")),
+        ("settings.telemetry.hint", ("Send anonymous usage metrics to help improve Aegis AI. Never on by default.", "Gửi chỉ số sử dụng ẩn danh để cải thiện Aegis AI. Mặc định tắt.")),
+        ("settings.telemetry.status.enabled", ("Opted in. Anonymous events will be sent.", "Đã tham gia. Sự kiện ẩn danh sẽ được gửi.")),
+        ("settings.telemetry.status.disabled", ("Not opted in. No data leaves your device.", "Chưa tham gia. Không có dữ liệu nào rời thiết bị.")),
+        ("settings.telemetry.opt_in", ("Opt in", "Tham gia")),
+        ("settings.telemetry.opt_out", ("Opt out", "Rút lui")),
         // Providers
         ("providers.title", ("AI Providers", "Nhà cung cấp AI")),
         ("providers.add", ("Add provider", "Thêm provider")),
@@ -79,27 +153,24 @@ static TABLE: Lazy<HashMap<&'static str, (&'static str, &'static str)>> = Lazy::
         ("providers.test.failure", ("Connection failed", "Kết nối thất bại")),
         // Memory
         ("memory.title", ("Memory", "Bộ nhớ")),
-        ("memory.conversations", ("Conversations", "Cuộc trò chuyện")),
-        ("memory.activities", ("Activity log", "Nhật ký hoạt động")),
-        ("memory.knowledge", ("Knowledge base", "Cơ sở kiến thức")),
-        ("memory.search", ("Search…", "Tìm kiếm…")),
-        ("memory.clear_all", ("Clear everything", "Xóa toàn bộ")),
+        ("memory.search", ("Search memory…", "Tìm trong bộ nhớ…")),
         ("memory.stats.conversations", ("Conversations", "Cuộc trò chuyện")),
         ("memory.stats.messages", ("Messages", "Tin nhắn")),
         ("memory.stats.activities", ("Activities", "Hoạt động")),
-        ("memory.stats.knowledge", ("Facts", "Sự kiện")),
+        ("memory.stats.knowledge", ("Knowledge entries", "Mục kiến thức")),
+        ("memory.knowledge.add", ("Remember this", "Ghi nhớ điều này")),
+        ("memory.knowledge.empty", ("No knowledge entries yet. Tell the AI to remember something.", "Chưa có mục kiến thức. Yêu cầu AI ghi nhớ điều gì đó.")),
         // Security
         ("security.title", ("Security", "Bảo mật")),
-        ("security.status", ("Status", "Trạng thái")),
         ("security.monitor", ("Process monitor", "Theo dõi tiến trình")),
         ("security.auto_defense", ("Auto-defense", "Tự động phòng thủ")),
-        ("security.scanner", ("Virus scanner", "Quét virus")),
-        ("security.scan_now", ("Scan now", "Quét ngay")),
+        ("security.scanner", ("On-demand scanner", "Quét theo yêu cầu")),
         ("security.quarantine", ("Quarantine", "Cách ly")),
-        ("security.restore", ("Restore", "Khôi phục")),
-        ("security.delete", ("Delete permanently", "Xóa vĩnh viễn")),
+        ("security.quarantine.empty", ("No quarantined files.", "Không có tệp bị cách ly.")),
+        ("security.quarantine.restore", ("Restore", "Khôi phục")),
+        ("security.integrity", ("File integrity", "Toàn vẹn tệp")),
+        ("security.network_scan", ("Network scan", "Quét mạng")),
         ("security.threats.recent", ("Recent threats", "Mối đe dọa gần đây")),
-        ("security.events.recent", ("Recent defense events", "Sự kiện phòng thủ gần đây")),
         ("severity.info", ("Info", "Thông tin")),
         ("severity.low", ("Low", "Thấp")),
         ("severity.medium", ("Medium", "Trung bình")),
@@ -145,13 +216,14 @@ pub fn current() -> Locale {
     *CURRENT.read()
 }
 
-/// Translate a key. Falls back to English if the Vietnamese translation is
-/// missing, falls back to the key itself if neither exists.
+/// Translate a key using the current locale. For locales without a backend
+/// translation table (es, fr, de, ja, zh-CN), the frontend ships its own
+/// table; the backend falls back to English so server-side strings always
+/// render correctly.
 pub fn t(key: &str) -> String {
     let locale = current();
     if let Some((en, vi)) = TABLE.get(key) {
         match locale {
-            Locale::En => en.to_string(),
             Locale::Vi => {
                 if vi.is_empty() {
                     en.to_string()
@@ -159,6 +231,9 @@ pub fn t(key: &str) -> String {
                     vi.to_string()
                 }
             }
+            // All other locales fall back to English on the backend; the
+            // frontend uses its own per-locale table.
+            _ => en.to_string(),
         }
     } else {
         key.to_string()
@@ -171,8 +246,8 @@ pub fn all_for_locale(locale: Locale) -> serde_json::Value {
     let mut map = serde_json::Map::new();
     for (k, (en, vi)) in TABLE.iter() {
         let v = match locale {
-            Locale::En => en,
             Locale::Vi => vi,
+            _ => en,
         };
         map.insert(k.to_string(), serde_json::Value::String(v.to_string()));
     }
@@ -199,5 +274,40 @@ mod tests {
     fn missing_key_returns_key() {
         set_locale(Locale::En);
         assert_eq!(t("does.not.exist"), "does.not.exist");
+    }
+
+    #[test]
+    fn from_code_handles_all_seven_locales() {
+        assert_eq!(Locale::from_code("en"), Locale::En);
+        assert_eq!(Locale::from_code("vi"), Locale::Vi);
+        assert_eq!(Locale::from_code("es"), Locale::Es);
+        assert_eq!(Locale::from_code("fr"), Locale::Fr);
+        assert_eq!(Locale::from_code("de"), Locale::De);
+        assert_eq!(Locale::from_code("ja"), Locale::Ja);
+        assert_eq!(Locale::from_code("zh-CN"), Locale::ZhCn);
+        assert_eq!(Locale::from_code("zh_cn"), Locale::ZhCn);
+        assert_eq!(Locale::from_code("ZH"), Locale::ZhCn);
+    }
+
+    #[test]
+    fn unsupported_locale_falls_back_to_english() {
+        set_locale(Locale::Ja);
+        // Japanese has no backend table — `t()` should return English.
+        assert_eq!(t("nav.chat"), "Chat");
+    }
+
+    #[test]
+    fn codes_round_trip() {
+        for l in [
+            Locale::En,
+            Locale::Vi,
+            Locale::Es,
+            Locale::Fr,
+            Locale::De,
+            Locale::Ja,
+            Locale::ZhCn,
+        ] {
+            assert_eq!(Locale::from_code(l.code()), l);
+        }
     }
 }

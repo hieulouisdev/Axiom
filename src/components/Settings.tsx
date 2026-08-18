@@ -30,9 +30,10 @@ import {
   telemetryStatus,
   telemetryOptIn,
   telemetryOptOut,
+  i18nSetLocale,
 } from "../lib/tauri";
 import { useStore } from "../store";
-import { setLocale as setI18nLocale } from "../i18n";
+import { setLocale as setI18nLocale, SUPPORTED_LOCALES, LOCALE_LABELS } from "../i18n";
 import type { EncryptionStatus, SettingsDto } from "../types";
 
 export function Settings() {
@@ -69,9 +70,17 @@ export function Settings() {
     setSaving(true);
     try {
       await settingsSet(dto);
-      const l = dto.language === "vi" ? "vi" : "en";
+      // v0.8 fix: previously only "en" and "vi" were honored; now we sync
+      // every supported locale to both the frontend store and the backend
+      // Tauri command. Unknown codes are coerced to "en".
+      const l = SUPPORTED_LOCALES.includes(dto.language as typeof SUPPORTED_LOCALES[number])
+        ? (dto.language as typeof SUPPORTED_LOCALES[number])
+        : "en";
       setLocale(l);
       setI18nLocale(l);
+      await i18nSetLocale(l).catch(() => {
+        // Tauri command may be unavailable in dev mode without backend.
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -200,22 +209,19 @@ export function Settings() {
             <h3 className="text-sm font-semibold mb-3 text-aegis-900 dark:text-aegis-100">
               {t("settings.language")}
             </h3>
-            <div className="flex gap-2">
-              {[
-                { id: "en", label: "English" },
-                { id: "vi", label: "Tiếng Việt" },
-              ].map((l) => (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {SUPPORTED_LOCALES.map((id) => (
                 <button
-                  key={l.id}
-                  onClick={() => setDto({ ...dto, language: l.id })}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all
+                  key={id}
+                  onClick={() => setDto({ ...dto, language: id })}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
                     ${
-                      dto.language === l.id
-                        ? "bg-gradient-accent text-white"
+                      dto.language === id
+                        ? "bg-gradient-accent text-white shadow-soft"
                         : "bg-white dark:bg-aegis-night-50 border border-aegis-200 dark:border-aegis-night-50 text-aegis-700 dark:text-aegis-300 hover:bg-aegis-50 dark:hover:bg-aegis-night-300"
                     }`}
                 >
-                  {l.label}
+                  {LOCALE_LABELS[id]}
                 </button>
               ))}
             </div>

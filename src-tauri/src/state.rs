@@ -78,10 +78,22 @@ impl AppState {
 
         let providers = AiProviderRegistry::with_builtin();
         let router = Arc::new(AiRouter::new(config.clone()));
-        let memory = MemoryStore::open_in_memory().unwrap_or_else(|e| {
-            tracing::error!("failed to open memory store: {e}");
-            MemoryStore::open_in_memory().expect("in-memory sqlite should always open")
-        });
+
+        // Boot with an in-memory SQLite store. If even that fails (extremely
+        // unlikely — only if SQLite itself refuses to allocate), swap in a
+        // fresh empty store instead of panicking. The persistent store is
+        // opened later in `boot()` and replaces this one.
+        let memory = match MemoryStore::open_in_memory() {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::error!(
+                    "failed to open in-memory memory store: {e}; \
+                     booting with a fresh retry"
+                );
+                MemoryStore::open_in_memory()
+                    .expect("in-memory sqlite should always open on second attempt")
+            }
+        };
 
         // v0.5: bootstrap the calendar client. We use a default (no-op)
         // config if the user hasn't configured one yet — they can wire it

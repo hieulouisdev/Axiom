@@ -43,10 +43,14 @@ export function Sidebar() {
   const toggleTheme = useStore((s) => s.toggleTheme);
   const collapsed = useStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useStore((s) => s.toggleSidebar);
-  const [version, setVersion] = useState("0.7.0");
+  const [version, setVersion] = useState<string>("0.8.0");
 
   useEffect(() => {
-    appVersion().then(setVersion).catch(() => {});
+    appVersion()
+      .then((v) => setVersion(v))
+      .catch(() => {
+        // Backend not ready (dev mode without Tauri) — keep the default.
+      });
   }, []);
 
   return (

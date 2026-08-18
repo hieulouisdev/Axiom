@@ -2,7 +2,7 @@
 
 This file tracks the four-stage development plan for Aegis AI. Each phase has
 a clear goal, scope, deliverables, and exit criteria. The current release is
-**v0.7.0 (Phase 4 complete)**.
+**v0.8.0 (Phase 4 bug-sweep & i18n completion)**.
 
 ---
 

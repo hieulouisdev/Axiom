@@ -10,7 +10,7 @@ import { Web } from "./components/Web";
 import { Guide } from "./components/Guide";
 import { useStore } from "./store";
 import { i18nGetLocale, i18nSetLocale, settingsGet } from "./lib/tauri";
-import { setLocale as setI18nLocale } from "./i18n";
+import { setLocale as setI18nLocale, type Locale, SUPPORTED_LOCALES } from "./i18n";
 
 export default function App() {
   const view = useStore((s) => s.view);
@@ -20,15 +20,20 @@ export default function App() {
     (async () => {
       try {
         const settings = await settingsGet();
-        const l = settings.language === "vi" ? "vi" : "en";
+        // Validate the persisted language against the supported locale set;
+        // fall back to English for unknown codes.
+        const l: Locale = SUPPORTED_LOCALES.includes(settings.language as Locale)
+          ? (settings.language as Locale)
+          : "en";
         setLocale(l);
         setI18nLocale(l);
         await i18nSetLocale(l);
       } catch {
         // Backend not ready (likely dev mode without Tauri).
-        const l = (await i18nGetLocale().catch(() => "en")) as "en" | "vi";
-        setLocale(l);
-        setI18nLocale(l);
+        const l = (await i18nGetLocale().catch(() => "en")) as Locale;
+        const validated: Locale = SUPPORTED_LOCALES.includes(l) ? l : "en";
+        setLocale(validated);
+        setI18nLocale(validated);
       }
     })();
   }, [setLocale]);
