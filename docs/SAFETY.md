@@ -1,133 +1,110 @@
-# Safety policy
+# Safety Policy
 
-This document explains how Aegis AI's safety policy decides which computer-use
-actions require explicit user confirmation.
+How Aegis AI's safety policy decides which computer-use actions require confirmation.
 
-## The principle
+---
 
-The AI is **never** allowed to take a destructive action silently. Every
-operation flows through a 5-level risk classifier, and any action at
-`Medium` risk or higher requires explicit user consent before it runs.
+## The Principle
 
-## Risk levels
+The AI is **never** allowed to take a destructive action silently. Every operation flows through a 5-level risk classifier. Actions at `Medium` or higher require explicit user consent.
+
+---
+
+## Risk Levels
 
 | Level | Behavior |
 |---|---|
-| `Safe` | Action runs immediately. Read-only ops, whitelisted commands. |
-| `Low` | Action runs immediately. Writing to user-approved directories, opening trusted apps. |
-| `Medium` | **Requires confirmation.** Mutates user files outside the whitelist, runs non-whitelisted commands. |
-| `High` | **Requires confirmation.** File deletion, system-level changes, network-elevated ops. |
-| `Critical` | **Always requires confirmation**, even with `allow_autonomous=true`. Catastrophic operations: disk format, kernel changes, privilege escalation. |
+| `Safe` | Runs immediately — read-only ops, whitelisted commands |
+| `Low` | Runs immediately — write to whitelisted dirs, open trusted apps |
+| `Medium` | **Requires confirmation** — write outside whitelist, non-whitelisted command |
+| `High` | **Requires confirmation** — file deletion, system-level changes |
+| `Critical` | **Always requires confirmation** — disk format, kernel changes, privilege escalation |
 
-## Hard-deny list
+---
 
-Some actions are **denied outright** regardless of user confirmation. These
-cannot be performed even with `allow_autonomous=true`:
+## Hard-Deny List
 
-- Writing to system paths: `/etc/`, `/usr/`, `/bin/`, `/boot/`, `/proc/`,
-  `/sys/`, `/dev/`, `/root/`, `C:\Windows\`, `C:\Program Files\`, etc.
-- Deleting files in system paths.
-- Destructive commands: `rm -rf`, `mkfs`, `dd if=`, `format`, `shutdown`,
-  `reboot`, `killall`, `:(){:|:&};:`, `>/dev/sda`, `chmod -R 777`,
-  `chown -R`, `userdel`, `usermod`, `del /f`, `rd /s`, `reg delete`,
-  `regedit`, `net user`, `sc delete`, `systemctl disable`, `apt remove`,
-  `apt purge`, etc.
+Actions **denied outright** regardless of user confirmation or bypass mode:
 
-## User-controlled whitelists
+- **System path writes**: `/etc/`, `/usr/`, `/bin/`, `/boot/`, `C:\Windows\`, etc.
+- **Destructive commands**: `rm -rf`, `mkfs`, `dd if=`, `format`, `shutdown`, `:(){:|:&};:`
+- **Credential dumpers**: `mimikatz`, `procdump`, `lsass`
+- **Reverse shells**: `/dev/tcp/`, `nc -e`, `bash -i >&`
+- **Privilege escalation**: `sudo su`, `runas /user:admin`
 
-The user can configure two whitelists in `config.toml`:
+---
+
+## User-Controlled Whitelists
 
 ### `command_whitelist`
 
-Shell commands that may be run without confirmation. Defaults:
-
 ```toml
-command_whitelist = [
-  "ls", "cat", "echo", "pwd", "date",
-  "git status", "git log",
-  "tasklist", "systeminfo",
-]
+command_whitelist = ["ls", "cat", "echo", "pwd", "date", "git status", "git log"]
 ```
 
-The safety policy matches on the first whitespace-separated token, so adding
-`"git"` would whitelist `git status`, `git log`, `git diff`, etc. — be
-careful.
+Matches on the first whitespace-separated token. Adding `"git"` whitelists all git subcommands.
 
 ### `write_path_whitelist`
 
-Directories the AI may write to without confirmation. Defaults:
-
 ```toml
-write_path_whitelist = ["~/Documents/AegisAI/"]
+write_path_whitelist = ["~/Documents/AegisAI/", "~/Projects/", "~/src/", "~/code/"]
 ```
 
-`~` is expanded to the user's home directory.
+`~` expands to the user's home directory.
 
-## The confirmation flow
+---
 
-When an action requires confirmation:
+## Confirmation Flow
 
-1. The Rust backend returns an `Err(AegisError::SafetyConfirmation { token, summary })`.
-2. The React frontend intercepts the error and shows a modal with `summary`
-   and a `Confirm` / `Deny` button pair.
-3. If the user clicks **Confirm**, the frontend re-issues the original
-   request with `authorized=true`. The backend skips the safety policy and
-   runs the action.
-4. If the user clicks **Deny**, the action is not performed. The denial is
-   logged to the activity store.
+1. Backend returns `Err(AegisError::SafetyConfirmation { token, summary })`
+2. Frontend shows modal with `summary` + Confirm/Deny buttons
+3. **Confirm** → re-issue request with `authorized=true` → action runs
+4. **Deny** → action not performed; denial logged
 
-> **Note (v0.1):** the token-based confirmation table is a stub. The
-> frontend re-issues the original command with `authorized=true` rather
-> than using the token. Phase 2 will introduce a signed, short-lived
-> (60s) token table that prevents replay attacks.
+> **Note:** Token-based confirmation is currently a stub. Phase 2 will introduce signed, short-lived (60s) tokens.
 
-## `allow_autonomous` mode
+---
 
-If the user enables `allow_autonomous = true` in Settings, the safety
-policy is bypassed for `Medium` and `Low` risk actions. **`High` and
-`Critical` actions still require confirmation.**
+## Bypass Mode
 
-This mode is intended for trusted local providers (Ollama, LM Studio)
-where the user is comfortable with the AI acting without asking. It is
-**off by default** and carries an explicit warning in the UI.
+When enabled (user-only, AI cannot self-enable):
 
-## Activity log
+- Skips confirmation for `Medium` and `High` risk actions
+- **Never** skips `Critical` or hard-deny list
+- Expands write-path whitelist to include project directories
+- Orange indicator shown when active
 
-Every action — including denials — is recorded in the `activities` table
-with:
+---
 
-- `kind`: action category (e.g. `chat.user`, `computer.exec`, `heartbeat`).
-- `summary`: human-readable description.
-- `risk`: the risk level (if applicable).
-- `created_at_ms`: timestamp.
+## `allow_autonomous` Mode
 
-The log is visible under **Memory → Activities** and can be exported
-(Phase 4).
+Bypasses safety for `Medium` and `Low` actions only. `High` and `Critical` still require confirmation. Off by default with explicit UI warning.
+
+---
+
+## Activity Log
+
+Every action recorded in `activities` table with `kind`, `summary`, `risk`, `created_at_ms`. Visible under **Memory → Activities**.
+
+---
+
+## Threat Signatures
+
+Separate from the safety policy, the security subsystem matches running processes against threat signatures:
+
+- Reverse shells (`/dev/tcp/`, `nc -e`, `bash -i`)
+- Credential dumpers (`mimikatz`, `procdump`, `lsass`)
+- Crypto miners (`xmrig`, `stratum+tcp`, `minerd`)
+- Port scanners (`nmap`, `masscan`, `zmap`)
+
+Users can add custom signatures via `config.toml`.
+
+---
 
 ## Testing
-
-The safety policy has unit tests in `src-tauri/src/computer/safety.rs`:
-
-- `rm -rf /tmp/foo` → `RequireConfirmation` ✅
-- `ls -la` → `Allow` ✅
-- Writing to `/etc/passwd` → `Deny` ✅
-
-Run them with:
 
 ```bash
 cd src-tauri && cargo test safety
 ```
 
-## Threat signatures
-
-Separate from the safety policy, the security subsystem matches running
-processes against a list of threat signatures (`threat_signatures` in
-`config.toml`). Default signatures cover:
-
-- Reverse shell patterns (`/dev/tcp/`, `nc -e`, `bash -i`)
-- Credential dumpers (`mimikatz`, `procdump`, `lsass`)
-- Crypto miners (`xmrig`, `stratum+tcp`, `minerd`)
-- Port scanners (`nmap`, `masscan`, `zmap`)
-
-Users can add custom signatures. See `config.rs::ThreatSignature` for the
-schema.
+Key tests: `rm -rf /tmp/foo` → RequireConfirmation ✅ | `ls -la` → Allow ✅ | write `/etc/passwd` → Deny ✅

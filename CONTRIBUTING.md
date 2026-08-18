@@ -1,75 +1,71 @@
 # Contributing to Aegis AI
 
-Thanks for your interest in contributing! This document explains how to set
-up a development environment and submit changes.
+Thanks for your interest! This guide covers setup, coding standards, and the PR process.
 
-## Development setup
+---
+
+## Development Setup
 
 ### Prerequisites
 
-- **Rust 1.97.1** — pinned via `rust-toolchain.toml`. The correct version is
-  installed automatically when you run `cargo` for the first time.
-- **Node.js 20+** and **npm**.
+- **Rust 1.97.1** — pinned via `rust-toolchain.toml` (auto-installed on first `cargo` run)
+- **Node.js 20+** and **npm**
 - **Tauri 2 system deps**:
   - Linux: `sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev patchelf`
   - Windows: WebView2 runtime (pre-installed on Windows 11)
 
-### First run
+### First Run
 
 ```bash
 git clone https://github.com/hieulouisdev/Axiom.git
 cd Axiom
 npm install
-npm run tauri:dev
+npm run tauri:dev    # first build takes 5–10 min; hot reload after
 ```
 
-The first build takes 5–10 minutes (Tauri compiles all Rust deps). After
-that, hot reload is fast.
+---
 
-## Coding standards
+## Coding Standards
 
 ### Rust
 
-- `cargo fmt --all` is enforced in CI.
-- `cargo clippy --all-targets -- -D warnings` is enforced in CI
-  (warnings are tolerated in v0.1 due to intentional stubs).
-- Every public function / struct has a doc comment.
-- Error handling: use `anyhow::Result` for internal code,
-  `crate::error::AegisError` (with serde) for Tauri command boundaries.
-- No `unwrap()` in non-test code. Use `?` or `.context("…")`.
-- Async: prefer `tokio` runtime; use `async_trait` for trait methods.
+- `cargo fmt --all` enforced in CI
+- `cargo clippy --all-targets -- -D warnings` enforced in CI
+- Every public function/struct has a doc comment
+- Error handling: `anyhow::Result` internally, `AegisError` (with serde) at Tauri boundaries
+- No `unwrap()` in non-test code — use `?` or `.context("…")`
+- Async: `tokio` runtime; `async_trait` for trait methods
 
 ### TypeScript / React
 
-- `tsc --noEmit` must pass.
-- Functional components + hooks only (no class components).
-- Use the existing Tailwind utility classes (`aegis-card`, `aegis-btn`,
-  `aegis-input`, `aegis-toggle`) for consistent styling.
-- All user-visible strings go through the `t("…")` translation function.
-- No inline styles; all styling in `index.css` or component className.
+- `tsc --noEmit` must pass
+- Functional components + hooks only
+- Use Tailwind utility classes (`aegis-card`, `aegis-btn`, `aegis-input`, `aegis-toggle`)
+- All user-visible strings through `t("…")`
+- No inline styles
 
-## Project layout
+---
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module map.
+## Project Layout
 
-In short:
+- `src-tauri/src/ai/` — AI providers (one file per provider)
+- `src-tauri/src/computer/` — computer-use actions + safety policy
+- `src-tauri/src/security/` — monitor, scanner, defender, quarantine
+- `src-tauri/src/memory/` — SQLite-backed stores
+- `src-tauri/src/modes/` — continuous / on-demand
+- `src-tauri/src/i18n/` — 7-locale translation tables
+- `src-tauri/src/commands.rs` — Tauri IPC bridge
+- `src/components/` — React UI components
 
-- `src-tauri/src/ai/` — AI providers (one file per provider).
-- `src-tauri/src/computer/` — computer-use actions + safety policy.
-- `src-tauri/src/security/` — monitor, scanner, defender, quarantine.
-- `src-tauri/src/memory/` — SQLite-backed stores.
-- `src-tauri/src/modes/` — continuous / on-demand.
-- `src-tauri/src/i18n/` — translation tables.
-- `src-tauri/src/commands.rs` — Tauri IPC bridge.
-- `src/components/` — React UI components.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full module map.
 
-## Submitting changes
+---
 
-1. **Open an issue** describing what you intend to change (especially for
-   anything beyond a typo fix). Tag it with the relevant phase
-   (`phase-1`, `phase-2`, …) from the [Roadmap](ROADMAP.md).
-2. **Fork the repo** and create a branch: `git checkout -b feat/my-feature`.
-3. **Make your changes**. Keep commits focused — one logical change per commit.
+## Submitting Changes
+
+1. **Open an issue** describing the change. Tag it with the relevant phase.
+2. **Fork** and create a branch: `git checkout -b feat/my-feature`.
+3. **Make changes** — one logical change per commit.
 4. **Run checks**:
    ```bash
    cd src-tauri && cargo fmt --all && cargo test
@@ -78,47 +74,48 @@ In short:
 5. **Open a PR** against `main`. Reference the original issue.
 6. **Address review feedback**. CI must pass before merge.
 
-## Picking up a Phase 2+ task
+### Branch Naming
 
-The [Roadmap](ROADMAP.md) lists every Phase 2+ task as a checkbox. To claim
-one:
+- `feat/<desc>` — new features
+- `fix/<desc>` — bug fixes
+- `security/<desc>` — security changes
+- `docs/<desc>` — documentation
 
-1. Open an issue titled `<task title>` and tag it `phase-2` (or whichever
-   phase applies) plus `help-wanted` if you'd welcome collaboration.
-2. Link to the relevant roadmap section.
-3. Tag a maintainer for assignment.
+### Commit Format
 
-## Adding a new AI provider
+Use conventional commits: `feat:`, `fix:`, `security:`, `docs:`.
 
-This is the most common contribution. See
-[docs/PROVIDERS.md](docs/PROVIDERS.md) for the full guide. In short:
+---
 
-- If your provider is OpenAI-compatible: one file, ~15 lines, using the
-  `openai_compat::make(descriptor(...))` helper.
-- If it has a bespoke API shape (Anthropic, Gemini, Ollama): implement the
-  `Provider` trait directly.
+## Adding a New AI Provider
 
-## Reporting bugs
+See [docs/PROVIDERS.md](docs/PROVIDERS.md) for the full guide.
+
+- **OpenAI-compatible**: one file, ~15 lines, using `openai_compat::make(descriptor(...))`.
+- **Bespoke API** (Anthropic, Gemini, Ollama): implement the `Provider` trait directly.
+
+---
+
+## Reporting Bugs
 
 Open a GitHub issue with:
 
-- Aegis AI version (`app_version` command output, or `Cargo.toml`).
-- OS + version.
-- Steps to reproduce.
-- Expected vs. actual behavior.
-- Logs from `<data_dir>/logs/aegis.log` (if applicable).
+- Aegis AI version (`app_version` output or `Cargo.toml`)
+- OS + version
+- Steps to reproduce
+- Expected vs. actual behavior
+- Logs from `<data_dir>/logs/aegis.log` (if applicable)
 
-## Reporting security vulnerabilities
+## Reporting Security Vulnerabilities
 
-**Do not open a public issue.** See [SECURITY.md](SECURITY.md) for the
-responsible disclosure process.
+**Do not open a public issue.** See [SECURITY.md](SECURITY.md) for the responsible disclosure process.
 
-## Code of conduct
+---
 
-Be kind. Be patient with newcomers. Assume good intent. Disagree about
-ideas, not people.
+## Code of Conduct
+
+Be kind. Be patient with newcomers. Assume good intent. Disagree about ideas, not people.
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the
-[MIT license](LICENSE) that covers the project.
+By contributing, you agree that your contributions are licensed under the [MIT license](LICENSE).
