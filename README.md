@@ -5,9 +5,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.97.1-orange.svg)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-orange.svg)](https://tauri.app)
-[![Phase](https://img.shields.io/badge/Phase-3.3%20(v0.5)-green.svg)](ROADMAP.md)
+[![Phase](https://img.shields.io/badge/Phase-3.3%20(v0.7)-green.svg)](ROADMAP.md)
 
-> **Current release:** v0.5 — Phase 3 continues. Adds **Voice I/O** (cloud
+> **Current release:** v0.7 — Phase 3 continues. Adds **Voice I/O** (cloud
 > Whisper STT + OS-native TTS + Ctrl+Space push-to-talk hotkey), **Vector-
 > embedding RAG** (every chat now pulls the top-5 most similar stored facts
 > into the system prompt automatically), and **CalDAV calendar integration**
@@ -31,7 +31,7 @@ Anthropic-compat / Ollama-compat endpoint, or a generic webhook).
 
 Beyond chat, Aegis AI can **act on your computer** — open apps, read/write
 files, run shell commands, automate the GUI (mouse/keyboard), and capture
-the screen — but only with explicit consent for anything risky. As of v0.3,
+the screen — but only with explicit consent for anything risky. As of v0.7,
 the AI can also act as a **computer-use co-owner**: an agent loop lets it
 autonomously chain together **28 local tools** (shell, file ops including
 move/delete/glob/regex-search/diff-apply, app launch, screenshot, GUI
@@ -39,7 +39,7 @@ automation, clipboard, memory, git, process, code_eval, http_fetch,
 notify, open_url, skill switching) via OpenAI-style function-calling,
 while every action flows through the safety policy.
 
-New in v0.5: the AI's chat replies are now grounded in your stored facts
+New in v0.7: the AI's chat replies are now grounded in your stored facts
 via **vector-embedding RAG**. Whenever you send a message, Aegis searches
 the knowledge base for the top-5 most similar entries (character-trigram
 hash embeddings, cosine similarity ≥ 0.30) and prepends them to the system
@@ -53,14 +53,14 @@ uses `say`; optional ElevenLabs cloud TTS). And if you connect a CalDAV
 server (Nextcloud, Radicale, Synology, …), asking "what's on my calendar
 today?" surfaces today's VEVENTs directly.
 
-New in v0.4: the user can enable **Bypass Mode** — when on, the AI skips
+New in v0.7: the user can enable **Bypass Mode** — when on, the AI skips
 safety confirmations for medium- and high-risk actions (so it can write
 code into your project folders, run shell pipelines, delete files, etc.
 without prompting on every step), EXCEPT for an irrevocable hard-deny list
 (rm -rf /, mkfs, dd to device, sudo to root, credential dumpers, reverse
 shells, kernel modules). The audit log still records every action.
 
-Also new in v0.4: **Skills** — pick from 15 builtin specializations (code writer,
+Also new in v0.7: **Skills** — pick from 15 builtin specializations (code writer,
 code reviewer, refactorer, test writer, doc writer, git helper, sysadmin,
 researcher, data analyst, translator, summarizer, email drafter, debugger,
 architect, security auditor) and the AI's persona + preferred tools change
@@ -90,7 +90,7 @@ The UI is clean, white-themed, and supports **English (default)** and
   except for an irrevocable hard-deny list (rm -rf /, mkfs, sudo to root,
   reverse shells, kernel modules, credential dumpers). Expanded write
   whitelist includes `~/Projects`, `~/src`, `~/code`, `~/repos`, etc.
-- **28 AI tools** (v0.4: +14): shell, file ops (read/write/list/move/
+- **28 AI tools** (v0.7: +14): shell, file ops (read/write/list/move/
   delete/glob/regex-search/diff-apply), app launch, screenshot, GUI
   automation, clipboard, http_fetch, git_op, process_list, process_kill,
   code_eval (python3/node/bash), notify, open_url, memory (remember/lookup/
@@ -110,7 +110,7 @@ The UI is clean, white-themed, and supports **English (default)** and
   mode is on).
 - **Extended destructive-command denylist**: covers reverse shells,
   cryptominers, credential dumpers, process injection, exfiltration, and
-  more — plus the v0.4 irrevocable hard-deny list that always requires
+  more — plus the v0.7 irrevocable hard-deny list that always requires
   confirmation regardless of bypass mode.
 - **Auto-defense**: passive process monitor → threat signature matching →
   quarantine + kill, with full audit trail.

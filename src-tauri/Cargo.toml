@@ -28,6 +28,7 @@ tauri-plugin-clipboard-manager = "2.0"
 tauri-plugin-autostart = "2.0"
 tauri-plugin-global-shortcut = "2.0"
 tauri-plugin-process = "2.0"
+tauri-plugin-updater = "2"
 
 # Core async / serialization
 tokio = { workspace = true }

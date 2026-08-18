@@ -11,6 +11,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Globe,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import { useStore, type ViewId } from "../store";
@@ -31,6 +32,7 @@ const NAV: NavItem[] = [
   { id: "memory", icon: Database, key: "nav.memory" },
   { id: "security", icon: Lock, key: "nav.security" },
   { id: "modes", icon: Sun, key: "nav.modes" },
+  { id: "guide", icon: BookOpen, key: "nav.guide" },
   { id: "settings", icon: SettingsIcon, key: "nav.settings" },
 ];
 
@@ -41,7 +43,7 @@ export function Sidebar() {
   const toggleTheme = useStore((s) => s.toggleTheme);
   const collapsed = useStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useStore((s) => s.toggleSidebar);
-  const [version, setVersion] = useState("0.6.0");
+  const [version, setVersion] = useState("0.7.0");
 
   useEffect(() => {
     appVersion().then(setVersion).catch(() => {});

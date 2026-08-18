@@ -7,6 +7,7 @@ import { Security } from "./components/Security";
 import { Settings } from "./components/Settings";
 import { Modes } from "./components/Modes";
 import { Web } from "./components/Web";
+import { Guide } from "./components/Guide";
 import { useStore } from "./store";
 import { i18nGetLocale, i18nSetLocale, settingsGet } from "./lib/tauri";
 import { setLocale as setI18nLocale } from "./i18n";
@@ -43,6 +44,7 @@ export default function App() {
         {view === "security" && <Security />}
         {view === "modes" && <Modes />}
         {view === "settings" && <Settings />}
+        {view === "guide" && <Guide />}
       </main>
     </div>
   );

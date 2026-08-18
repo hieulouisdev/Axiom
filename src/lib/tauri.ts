@@ -9,7 +9,6 @@ import type {
   FileReadResult,
   MemoryStats,
   Message,
-  MobileCapabilities,
   ProviderDto,
   ScanResult,
   SearchResult,
@@ -169,10 +168,24 @@ export const webFetch = (url: string) =>
 export const webFetchRaw = (url: string, method?: string, body?: string) =>
   invoke<WebFetchRawResult>("web_fetch_raw", { url, method: method ?? null, body: body ?? null });
 
-// ===== v0.6 — Mobile capabilities =====
-export const mobileCapabilities = () =>
-  invoke<MobileCapabilities>("mobile_capabilities");
-
 // ===== System =====
 export const appVersion = () => invoke<string>("app_version");
 export const appQuit = () => invoke("app_quit");
+
+// ===== v0.7 — Phase 4.2: Sandbox =====
+export const sandboxStatus = () =>
+  invoke<{ enabled: boolean; allowed_dirs: string[]; allow_home_subdirs: boolean }>("sandbox_status");
+export const sandboxSetEnabled = (enabled: boolean) =>
+  invoke<void>("sandbox_set_enabled", { enabled });
+export const sandboxAddDir = (dir: string) =>
+  invoke<void>("sandbox_add_dir", { dir });
+export const sandboxRemoveDir = (dir: string) =>
+  invoke<void>("sandbox_remove_dir", { dir });
+
+// ===== v0.7 — Phase 4.3: Telemetry =====
+export const telemetryStatus = () =>
+  invoke<{ enabled: boolean; prompted: boolean; pending_count: number; install_id: string }>("telemetry_status");
+export const telemetryOptIn = () =>
+  invoke<void>("telemetry_opt_in");
+export const telemetryOptOut = () =>
+  invoke<void>("telemetry_opt_out");

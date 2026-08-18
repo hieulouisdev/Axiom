@@ -34,6 +34,7 @@ use crate::{
     security::{
         self, monitor::Threat, quarantine::QuarantineEntry, scanner::ScanResult, DefenseEvent,
         integrity::IntegrityEvent, network::{NetworkAnomaly, SocketInfo},
+        sandbox::SandboxPolicy, telemetry::TelemetryConfig,
     },
     state::AppState,
 };
@@ -1716,16 +1717,8 @@ pub fn memory_forget_all(state: State<'_, Arc<Mutex<AppState>>>) -> Result<()> {
 }
 
 // ===========================================================================
-// v0.6 — Mobile companion capabilities
+// Helpers
 // ===========================================================================
-
-/// Return the mobile companion capabilities (Phase 3.5). Used by the
-/// (future) pairing handshake over the local relay.
-#[tauri::command]
-pub fn mobile_capabilities() -> serde_json::Value {
-    let caps = crate::mobile::capabilities();
-    serde_json::to_value(&caps).unwrap_or_else(|_| serde_json::json!({}))
-}
 
 /// Tiny CSV writer — avoids pulling in the `csv` crate for one endpoint.
 fn csv_writer() -> CsvWriter {
@@ -1763,4 +1756,112 @@ impl CsvWriter {
     fn to_string(&self) -> String {
         self.buf.clone()
     }
+}
+
+// ===========================================================================
+// v0.7 — Phase 4.2: Sandbox
+// ===========================================================================
+
+/// DTO for sandbox policy state.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SandboxPolicyDto {
+    pub enabled: bool,
+    pub allowed_dirs: Vec<String>,
+    pub allow_home_subdirs: bool,
+}
+
+impl From<&SandboxPolicy> for SandboxPolicyDto {
+    fn from(p: &SandboxPolicy) -> Self {
+        Self {
+            enabled: p.enabled,
+            allowed_dirs: p.allowed_dirs.clone(),
+            allow_home_subdirs: p.allow_home_subdirs,
+        }
+    }
+}
+
+/// Return the current sandbox policy.
+#[tauri::command]
+pub fn sandbox_status(state: State<'_, SharedState>) -> Result<SandboxPolicyDto, String> {
+    let s = state.lock();
+    let policy = s.sandbox.lock();
+    Ok(SandboxPolicyDto::from(&*policy))
+}
+
+/// Enable or disable the sandbox.
+#[tauri::command]
+pub fn sandbox_set_enabled(state: State<'_, SharedState>, enabled: bool) -> Result<(), String> {
+    let s = state.lock();
+    let mut policy = s.sandbox.lock();
+    policy.enabled = enabled;
+    tracing::info!("sandbox: enabled={enabled}");
+    Ok(())
+}
+
+/// Add a directory to the sandbox allow-list.
+#[tauri::command]
+pub fn sandbox_add_dir(state: State<'_, SharedState>, dir: String) -> Result<(), String> {
+    let s = state.lock();
+    let mut policy = s.sandbox.lock();
+    policy.add_allowed_dir(dir);
+    Ok(())
+}
+
+/// Remove a directory from the sandbox allow-list.
+#[tauri::command]
+pub fn sandbox_remove_dir(state: State<'_, SharedState>, dir: String) -> Result<(), String> {
+    let s = state.lock();
+    let mut policy = s.sandbox.lock();
+    policy.remove_allowed_dir(&dir);
+    Ok(())
+}
+
+// ===========================================================================
+// v0.7 — Phase 4.3: Telemetry
+// ===========================================================================
+
+/// DTO for telemetry summary.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TelemetrySummaryDto {
+    pub enabled: bool,
+    pub prompted: bool,
+    pub pending_count: usize,
+    pub install_id: String,
+}
+
+impl From<security::telemetry::TelemetrySummary> for TelemetrySummaryDto {
+    fn from(s: security::telemetry::TelemetrySummary) -> Self {
+        Self {
+            enabled: s.enabled,
+            prompted: s.prompted,
+            pending_count: s.pending_count,
+            install_id: s.install_id,
+        }
+    }
+}
+
+/// Return the current telemetry summary.
+#[tauri::command]
+pub fn telemetry_status(state: State<'_, SharedState>) -> Result<TelemetrySummaryDto, String> {
+    let s = state.lock();
+    let cfg = s.telemetry.lock();
+    Ok(TelemetrySummaryDto::from(cfg.summary()))
+}
+
+/// Opt in to telemetry collection.
+#[tauri::command]
+pub fn telemetry_opt_in(state: State<'_, SharedState>) -> Result<(), String> {
+    let s = state.lock();
+    let mut cfg = s.telemetry.lock();
+    cfg.opt_in();
+    Ok(())
+}
+
+/// Opt out of telemetry collection.
+#[tauri::command]
+pub fn telemetry_opt_out(state: State<'_, SharedState>) -> Result<(), String> {
+    let s = state.lock();
+    let mut cfg = s.telemetry.lock();
+    cfg.opt_out();
+    Ok(())
 }

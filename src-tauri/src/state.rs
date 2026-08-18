@@ -11,7 +11,11 @@ use crate::{
     calendar::{CalendarClient, CalendarConfig},
     config::{AppConfig, ConfigStore},
     memory::store::MemoryStore,
-    security::quarantine::QuarantineStore,
+    security::{
+        quarantine::QuarantineStore,
+        sandbox::SandboxPolicy,
+        telemetry::TelemetryConfig,
+    },
     voice::HotkeyManager,
 };
 
@@ -54,6 +58,12 @@ pub struct AppState {
 
     /// v0.5: CalDAV calendar client. Cheap to clone; safe to share.
     pub calendar: Mutex<CalendarClient>,
+
+    /// v0.7: AI sandbox policy — enforces file-write allow-lists.
+    pub sandbox: Mutex<SandboxPolicy>,
+
+    /// v0.7: Telemetry config — opt-in only, never on by default.
+    pub telemetry: Mutex<TelemetryConfig>,
 }
 
 impl AppState {
@@ -94,6 +104,8 @@ impl AppState {
             quarantine: Mutex::new(QuarantineStore::new()),
             hotkey: Arc::new(HotkeyManager::new()),
             calendar: Mutex::new(calendar),
+            sandbox: Mutex::new(SandboxPolicy::default()),
+            telemetry: Mutex::new(TelemetryConfig::new()),
         }))
     }
 

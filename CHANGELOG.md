@@ -4,6 +4,54 @@ All notable changes to Aegis AI are documented in this file. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-08-18 — Phase 4: Hardening & Distribution
+
+### Added
+
+- **AI sandbox** (`security::sandbox`): file-write allow-list enforcement even in
+  autonomous/bypass mode. Platform-specific defaults for home subdirectories.
+  New Tauri commands: `sandbox_status`, `sandbox_set_enabled`, `sandbox_add_dir`,
+  `sandbox_remove_dir`.
+- **Telemetry opt-in layer** (`security::telemetry`): anonymous usage metrics,
+  **never on by default**. `telemetry_status`, `telemetry_opt_in`,
+  `telemetry_opt_out` Tauri commands. 1000-event cap, random install UUID.
+- **Auto-update**: `tauri-plugin-updater` integrated with GitHub Releases endpoint.
+- **CI/CD pipeline**: GitHub Actions workflow for Linux (deb/AppImage/rpm) and
+  Windows (msi/nsis) builds, SHA-256 checksums, tag-triggered releases.
+- **Threat model document** (`docs/threat-model.md`): trust boundaries, attack
+  trees, mitigations, residual risks.
+- **Security white paper** (`docs/security-whitepaper.md`): architecture security,
+  credential management, AI safety, privacy, SOC 2 compliance.
+- **SOC 2 Type II checklist** (`docs/soc2-checklist.md`): 46 items across all 5
+  Trust Service Criteria.
+- **Developer guide** (`docs/developer-guide.md`): setup, architecture, how to add
+  providers/tools/commands, testing, debugging.
+- **Architecture Decision Records** (`docs/adr/`): 5 ADRs covering IPC bridge,
+  credential storage, AI safety, embedding strategy, memory store.
+- **mdBook user guide** (`docs/user-guide/`): 12 chapters covering all features.
+- **In-app User Guide** (`Guide.tsx`): 11-section interactive help panel with
+  search, keyboard shortcuts, troubleshooting. Available from the sidebar.
+- **5 new languages**: Spanish (es), French (fr), German (de), Japanese (ja),
+  Simplified Chinese (zh-CN). 92 keys each.
+- **Reproducible builds documentation** (`docs/reproducible-builds.md`).
+- **Cargo audit config** (`cargo-audit.toml`).
+
+### Changed
+
+- **Settings UI**: added AI Sandbox and Telemetry configuration panels.
+- **i18n**: expanded `Locale` type to 7 languages; added new keys for guide,
+  sandbox, and telemetry sections.
+- **Sidebar**: added "User Guide" navigation item.
+
+### Removed
+
+- **Mobile companion** (`mobile.rs`): removed all mobile scaffold code and
+  `mobile_capabilities` command. Aegis AI is desktop-only (Linux + Windows).
+
+### Fixed
+
+- Various Phase 4 development bug fixes.
+
 ## [0.6.0] — 2026-08-18 — Real Web Access + UI Overhaul + Phase 3 Completion
 
 ### Added — Real web access (`src-tauri/src/ai/web.rs`)

@@ -1,0 +1,100 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build Tauri (Linux)
+        uses: tauri-apps/tauri-action@v0
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Aegis AI ${{ github.ref_name }}'
+          releaseBody: 'See CHANGELOG.md for details.'
+          releaseDraft: false
+          prerelease: false
+          args: '--target x86_64-unknown-linux-gnu'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate checksums
+        run: |
+          cd src-tauri/target/release/bundle
+          find . -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*.rpm' \) -exec sha256sum {} \; > checksums-linux.txt
+
+      - name: Upload Linux checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums-linux
+          path: src-tauri/target/release/bundle/checksums-linux.txt
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build Tauri (Windows)
+        uses: tauri-apps/tauri-action@v0
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Aegis AI ${{ github.ref_name }}'
+          releaseBody: 'See CHANGELOG.md for details.'
+          releaseDraft: false
+          prerelease: false
+          args: '--target x86_64-pc-windows-msvc'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate checksums
+        run: |
+          cd src-tauri/target/release/bundle
+          Get-ChildItem -Recurse -Include '*.msi','*.exe' | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            "$hash  $($_.Name)"
+          } | Out-File checksums-windows.txt
+        shell: pwsh
+
+      - name: Upload Windows checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums-windows
+          path: src-tauri/target/release/bundle/checksums-windows.txt

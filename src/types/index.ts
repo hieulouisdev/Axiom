@@ -1,4 +1,4 @@
-export type Locale = "en" | "vi";
+export type Locale = "en" | "vi" | "es" | "fr" | "de" | "ja" | "zh-CN";
 
 export type ViewId =
   | "chat"
@@ -7,7 +7,8 @@ export type ViewId =
   | "security"
   | "modes"
   | "settings"
-  | "web";
+  | "web"
+  | "guide";
 
 export interface ProviderDto {
   id: string;
@@ -154,13 +155,6 @@ export interface WebFetchRawResult {
 }
 
 // ===== v0.6 — Memory / entities / encryption =====
-export interface MobileCapabilities {
-  max_conversations: number;
-  remote_actions_enabled: boolean;
-  e2ee_sync_available: boolean;
-  desktop_version: string;
-}
-
 export interface EncryptionStatus {
   status: "not_supported" | "disabled" | "enabled";
   supported: boolean;

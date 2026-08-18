@@ -1,0 +1,20 @@
+# cargo-audit configuration
+# See: https://rustsec.github.io/advisory-db/
+
+[advisories]
+# Ignore specific advisories by ID (uncomment and add as needed)
+# ignore = []
+
+[database]
+# Use the official RustSec advisory database
+url = "https://github.com/RustSec/advisory-db"
+fetch = true
+
+[output]
+# Show advisory links for quick reference
+quiet = false
+warning = true
+
+[yanked]
+# Deny yanked crates — they may have been removed for security reasons
+enabled = true

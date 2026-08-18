@@ -8,7 +8,8 @@ export type ViewId =
   | "security"
   | "modes"
   | "settings"
-  | "web";
+  | "web"
+  | "guide";
 
 export type Theme = "light" | "dark";
 

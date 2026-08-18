@@ -28,7 +28,6 @@ pub mod config;
 pub mod error;
 pub mod i18n;
 pub mod memory;
-pub mod mobile;
 pub mod modes;
 pub mod security;
 pub mod state;
@@ -67,6 +66,7 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             // Boot background services.
             let handle = app.handle().clone();
@@ -179,8 +179,6 @@ pub fn run() {
             commands::yara_list,
             commands::yara_ensure_dir,
             commands::audit_export,
-            // ===== v0.6 — Mobile companion capabilities =====
-            commands::mobile_capabilities,
             // ===== Computer use =====
             commands::computer_exec_command,
             commands::computer_open_app,
@@ -221,6 +219,15 @@ pub fn run() {
             commands::i18n_get_locale,
             commands::i18n_set_locale,
             commands::i18n_translate,
+            // ===== v0.7 — Phase 4.2: Sandbox =====
+            commands::sandbox_status,
+            commands::sandbox_set_enabled,
+            commands::sandbox_add_dir,
+            commands::sandbox_remove_dir,
+            // ===== v0.7 — Phase 4.3: Telemetry =====
+            commands::telemetry_status,
+            commands::telemetry_opt_in,
+            commands::telemetry_opt_out,
             // ===== System =====
             commands::app_version,
             commands::app_quit,

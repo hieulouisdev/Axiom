@@ -12,7 +12,9 @@ pub mod integrity;
 pub mod monitor;
 pub mod network;
 pub mod quarantine;
+pub mod sandbox;
 pub mod scanner;
+pub mod telemetry;
 pub mod yara;
 
 pub use alerts::{AlertConfig, send_alert};
@@ -22,6 +24,8 @@ pub use monitor::{start as start_monitor, ProcessSnapshot, Threat};
 pub use network::{NetworkAnomaly, SocketInfo, detect_anomalies};
 pub use quarantine::{QuarantineEntry, QuarantineStore};
 pub use scanner::{scan_directory, scan_file, ScanResult};
+pub use sandbox::{SandboxPolicy};
+pub use telemetry::{TelemetryConfig, TelemetryEvent, TelemetrySummary};
 pub use yara::{YaraRule, load_all as load_yara_rules, scan_file as yara_scan_file};
 
 /// Severity levels shared across the security subsystem.
