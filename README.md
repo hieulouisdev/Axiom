@@ -1,4 +1,6 @@
 <div align="center">
+  <img src="public/logoapp.png" alt="Aegis AI Logo" width="150">
+</div>
 
 # Aegis AI
 
