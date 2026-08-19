@@ -231,7 +231,7 @@ function ProviderEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-aegis-900/40 dark:bg-aegis-950/60 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-aegis-900/40 dark:bg-aegis-950/60 backdrop-blur-xs animate-fade-in">
       <div className="bg-white dark:bg-aegis-night-200 rounded-2xl shadow-elevated w-full max-w-md p-6 animate-slide-up border border-aegis-200 dark:border-aegis-night-50">
         <div className="flex items-start justify-between mb-4">
           <div>

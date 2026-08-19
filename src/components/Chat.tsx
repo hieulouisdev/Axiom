@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Send, Plus, AlertTriangle, Loader2, Square, Copy, Check, Sparkles } from "lucide-react";
-import { useStore } from "../store";
 import { t } from "../i18n";
 import { aiChat, aiChatStream, aiChatCancel } from "../lib/tauri";
 import { listen } from "@tauri-apps/api/event";
@@ -22,7 +21,7 @@ export function Chat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const unlistenRefs = useRef<Function[]>([]);
+  const unlistenRefs = useRef<Array<() => void>>([]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -225,7 +224,7 @@ export function Chat() {
             }}
             placeholder={t("chat.placeholder")}
             rows={1}
-            className="flex-1 resize-none px-2 py-1.5 text-sm bg-transparent focus:outline-none placeholder:text-aegis-400 dark:placeholder:text-aegis-500 text-aegis-800 dark:text-aegis-100 max-h-40"
+            className="flex-1 resize-none px-2 py-1.5 text-sm bg-transparent focus:outline-hidden placeholder:text-aegis-400 dark:placeholder:text-aegis-500 text-aegis-800 dark:text-aegis-100 max-h-40"
           />
           {streaming ? (
             <button

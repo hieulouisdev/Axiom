@@ -2,6 +2,83 @@
 
 All notable changes to Aegis AI. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] — 2026-08-19 — Toolchain & Dependency Modernization
+
+A full-stack upgrade release built on **Rust 1.97.1**. Every major
+dependency on both sides of the app (Rust backend and TypeScript frontend)
+was moved to its current stable release, the Rust workspace migrated to
+**edition 2024**, and the CI pipeline was updated to match. All quality
+gates stay green: `cargo fmt --check`, `cargo clippy -D warnings`, and
+**104/104 unit tests pass**.
+
+### Changed — Rust backend
+
+- **Rust edition 2024** — the workspace moved from edition 2021 to edition
+  2024 (still pinned to Rust 1.97.1 via `rust-toolchain.toml`).
+  `cargo fix --edition` rewrote affected `if let`/`else` chains to `match`
+  where drop-order semantics changed, and test code that mutates
+  Aegis-specific environment variables now uses explicit `unsafe` blocks
+  (edition 2024 marks `std::env::set_var`/`remove_var` as `unsafe`).
+- **Tauri 2.0 → 2.11** across the core framework and all 11 official
+  plugins (shell, fs, dialog, notification, store, clipboard-manager,
+  autostart, global-shortcut, process, updater), plus `tauri-build` 2.6.
+- **reqwest 0.12 → 0.13** — TLS feature renamed from `rustls-tls` to
+  `rustls`, and the `query` feature is now explicit.
+- **rusqlite 0.32 → 0.40** (bundled SQLite) for the memory store.
+- **keyring 2 → 4** — credential deletion now uses `delete_credential()`
+  (the `delete_password()` name was retired).
+- **enigo 0.2 → 0.6** — GUI automation backend (trait-based
+  `Keyboard`/`Mouse` API confirmed compatible).
+- **screenshots 0.2 → 0.8** — complete `computer/screen.rs` rewrite on the
+  `Screen` API. Capture now returns a raw `RgbaImage` that we PNG-encode
+  via the re-exported `image` crate. **`screenshot_area()` now performs a
+  real native region capture** (`capture_area`) instead of returning the
+  full screen.
+- **notify 6 → 8** for the proactive file watcher.
+- **nix 0.29 → 0.31**, **procfs 0.16 → 0.18** (Linux process/network
+  monitoring), **windows 0.58 → 0.62** (Windows process/token APIs).
+- **tokio 1.42 → 1.53**, **uuid 1.11 → 1.24**, **sha2 0.10 → 0.11**,
+  **base64 0.22 → 0.23**, **bytes 1.9 → 1.12**, **once_cell 1.20 → 1.21**,
+  **regex 1.11 → 1.13**, **http 1.1 → 1.5**, **aws-sigv4 1.2 → 1.5**,
+  **toml 0.8 → 1.1**, **directories / dirs 5 → 6**.
+- 45 new clippy lints raised by Rust 1.97.1 (`collapsible_if`,
+  `let_and_return`, …) were auto-fixed; the codebase is clean under
+  `cargo clippy --lib --tests -- -D warnings`.
+
+### Changed — Frontend
+
+- **React 18 → 19** (with `@types/react` 19) — the deprecated global
+  `JSX` namespace usage in `Guide.tsx` was migrated to the `react`-scoped
+  `JSX` import.
+- **Vite 5 → 8** (Rolldown-based) with **@vitejs/plugin-react 6** — the
+  `build.minify: "esbuild"` option was dropped in favor of the default
+  Oxc minifier.
+- **Tailwind CSS 3 → 4** — CSS-first setup via `@import "tailwindcss"`,
+  the existing JS design-token config is preserved through `@config`, and
+  the class-based dark mode is restored with `@custom-variant`. Renamed
+  v4 utilities applied: `outline-none → outline-hidden`,
+  `blur-sm → blur-xs`.
+- **zustand 4 → 5**, **lucide-react 0.460 → 1.32**,
+  **tailwind-merge 2 → 3**, **TypeScript 5.6 → 5.9**, **@types/node 26**.
+- **ESLint 10 flat config** added (`eslint.config.js` with
+  `typescript-eslint` recommended) so `npm run lint` works out of the box;
+  **Prettier 3** pinned for `npm run format`. One real issue surfaced and
+  fixed: `Chat.tsx` used the loose `Function` type for Tauri event
+  unlisteners — now typed as `Array<() => void>`, and an unused import was
+  removed.
+
+### Changed — CI/CD
+
+- GitHub Actions now use **Node 22** (required floor for Vite 8:
+  `^20.19 || >=22.12`). Rust remains pinned at **1.97.1** in both
+  workflows, matching `rust-toolchain.toml`.
+
+### Notes
+
+- The `screenshots 0.8.10` crate itself emits a cargo future-incompat
+  notice; it is informational only and does not affect the build or any
+  quality gate.
+
 ## [1.0.0] — 2026-08-19 — General-Availability Release
 
 This is the first stable, production-tagged release of Aegis AI. Every

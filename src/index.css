@@ -1,6 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* v1.1: Tailwind CSS 4 — keep the existing JS design-token config via
+   @config, and restore the v3 `dark:` class strategy via @custom-variant. */
+@config "../tailwind.config.js";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   html,
@@ -63,7 +66,11 @@
   }
 
   .aegis-card-hover {
-    @apply aegis-card transition-all duration-200 hover:shadow-elevated
+    /* v1.1 (Tailwind 4): @apply can no longer reference other custom
+       classes, so the `.aegis-card` utility list is inlined here. */
+    @apply bg-white border border-aegis-200 rounded-xl shadow-card
+           dark:bg-aegis-night-100 dark:border-aegis-night-50 dark:shadow-none
+           transition-all duration-200 hover:shadow-elevated
            hover:border-aegis-300 dark:hover:border-aegis-700;
   }
 
@@ -98,7 +105,7 @@
   .aegis-input {
     @apply w-full px-3 py-2 rounded-lg text-sm bg-white border border-aegis-200
            text-aegis-800 placeholder:text-aegis-400
-           focus:outline-none focus:ring-2 focus:ring-aegis-accent/20 focus:border-aegis-accent
+           focus:outline-hidden focus:ring-2 focus:ring-aegis-accent/20 focus:border-aegis-accent
            transition-all
            dark:bg-aegis-night-200 dark:border-aegis-night-50 dark:text-aegis-100 dark:placeholder:text-aegis-500;
   }
@@ -106,7 +113,7 @@
   /* Toggle switch */
   .aegis-toggle {
     @apply relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200
-           focus:outline-none focus:ring-2 focus:ring-aegis-accent/30 cursor-pointer;
+           focus:outline-hidden focus:ring-2 focus:ring-aegis-accent/30 cursor-pointer;
   }
   .aegis-toggle[data-checked="true"] {
     @apply bg-aegis-accent;

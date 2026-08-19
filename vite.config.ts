@@ -12,7 +12,7 @@ export default defineConfig({
   envPrefix: ["VITE_", "TAURI_"],
   build: {
     target: "esnext",
-    minify: "esbuild",
+    // v1.1 (Vite 8 / Rolldown): the default Oxc minifier replaces esbuild.
     sourcemap: false,
   },
 });

@@ -1,6 +1,6 @@
 # Aegis AI — Development Roadmap
 
-Current release: **v1.0.0** (General Availability). The project follows a 4-phase plan.
+Current release: **v1.1.0** (Toolchain & Dependency Modernization). The project follows a 4-phase plan.
 
 ---
 
@@ -88,7 +88,18 @@ bumped to 1.0.0 across all manifests. See CHANGELOG.md for the full list.
 
 ---
 
-## Next: v1.1 — Hardening & macOS
+## v1.1.0 — Toolchain & Dependency Modernization ✅
+
+Full-stack upgrade on Rust 1.97.1: Rust edition 2024, all backend crates
+moved to current majors (Tauri 2.11, reqwest 0.13, rusqlite 0.40, keyring 4,
+enigo 0.6, screenshots 0.8, notify 8, windows 0.62, …), frontend moved to
+React 19 + Vite 8 (Rolldown) + Tailwind CSS 4 + zustand 5, ESLint 10 flat
+config introduced, CI bumped to Node 22. 104/104 unit tests pass, clippy
+`-D warnings` clean. See CHANGELOG.md for the full list.
+
+---
+
+## Next: v1.2 — Hardening & macOS
 
 | Task | Priority |
 |---|---|

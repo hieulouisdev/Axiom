@@ -75,7 +75,7 @@ export function Web() {
                   if (e.key === "Enter") search();
                 }}
                 placeholder={t("web.placeholder")}
-                className="flex-1 py-2.5 text-sm bg-transparent focus:outline-none placeholder:text-aegis-400 dark:placeholder:text-aegis-500 text-aegis-800 dark:text-aegis-100"
+                className="flex-1 py-2.5 text-sm bg-transparent focus:outline-hidden placeholder:text-aegis-400 dark:placeholder:text-aegis-500 text-aegis-800 dark:text-aegis-100"
               />
             </div>
             <button
