@@ -5,7 +5,7 @@ name: Build & Release
 # and uploads SHA-256 checksums as build artifacts.
 #
 # The pipeline:
-#   1. Install Rust 1.97.1 (pinned via rust-toolchain.toml) and Node 20.
+#   1. Install Rust 1.97.1 (pinned via rust-toolchain.toml) and Node 22.
 #   2. Run `cargo fmt --check` and `cargo clippy -D warnings` as hard
 #      gates — they MUST pass before any binary is produced.
 #   3. Run `cargo test --lib` on Linux to ensure the unit suite passes.
@@ -50,10 +50,10 @@ jobs:
             tesseract-ocr \
             libayatana-appindicator3-dev
 
-      - name: Setup Node 20
+      - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install Rust 1.97.1
@@ -110,10 +110,10 @@ jobs:
             tesseract-ocr \
             libayatana-appindicator3-dev
 
-      - name: Setup Node 20
+      - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install Rust 1.97.1
@@ -192,10 +192,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Node 20
+      - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install Rust 1.97.1

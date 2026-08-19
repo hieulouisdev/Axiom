@@ -8,7 +8,7 @@ name: Release Build
 # re-run the build for an existing release if the first attempt failed.
 #
 # Pipeline:
-#   1. Install Rust 1.97.1 (matches rust-toolchain.toml) and Node 20.
+#   1. Install Rust 1.97.1 (matches rust-toolchain.toml) and Node 22.
 #   2. Run `cargo fmt --check` and `cargo clippy -D warnings` as hard gates.
 #   3. Run `cargo test --lib` to ensure unit tests pass before publishing.
 #   4. Build the Vite frontend (npm run build) → dist/
@@ -95,10 +95,10 @@ jobs:
           # the Tauri CLI panics with "Can't detect any appindicator library"
           # at the bundling step.
 
-      - name: Setup Node 20
+      - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install npm deps
