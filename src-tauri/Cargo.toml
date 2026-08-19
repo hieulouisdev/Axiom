@@ -14,21 +14,21 @@ name = "aegis_ai_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.0", features = [] }
+tauri-build = { version = "2.6", features = [] }
 
 [dependencies]
 # Tauri 2
-tauri = { version = "2.0", features = ["tray-icon"] }
-tauri-plugin-shell = "2.0"
-tauri-plugin-fs = "2.0"
-tauri-plugin-dialog = "2.0"
-tauri-plugin-notification = "2.0"
-tauri-plugin-store = "2.0"
-tauri-plugin-clipboard-manager = "2.0"
-tauri-plugin-autostart = "2.0"
-tauri-plugin-global-shortcut = "2.0"
-tauri-plugin-process = "2.0"
-tauri-plugin-updater = "2"
+tauri = { version = "2.11", features = ["tray-icon"] }
+tauri-plugin-shell = "2.3"
+tauri-plugin-fs = "2.5"
+tauri-plugin-dialog = "2.7"
+tauri-plugin-notification = "2.3"
+tauri-plugin-store = "2.4"
+tauri-plugin-clipboard-manager = "2.3"
+tauri-plugin-autostart = "2.5"
+tauri-plugin-global-shortcut = "2.3"
+tauri-plugin-process = "2.3"
+tauri-plugin-updater = "2.10"
 
 # Core async / serialization
 tokio = { workspace = true }
@@ -59,51 +59,51 @@ dirs = { workspace = true }
 toml = { workspace = true }
 
 # Misc
-once_cell = "1.20"
+once_cell = "1.21"
 parking_lot = "0.12"
 async-trait = "0.1"
 futures = "0.3"
-bytes = "1.9"
-base64 = "0.22"
+bytes = "1.12"
+base64 = "0.23"
 url = "2.5"
 
 # Phase 2: GUI automation
-enigo = "0.2"
+enigo = "0.6"
 
 # Phase 2: Screen capture
-screenshots = "0.2"
+screenshots = "0.8"
 
 # Phase 2: OCR
 rusty-tesseract = "1.1"
 
 # Phase 2: OS keychain for credential storage
-keyring = "2"
+keyring = "4"
 
 # Phase 2: AWS SigV4 for Bedrock
-aws-sigv4 = "1.2"
+aws-sigv4 = "1.5"
 aws-credential-types = "1.2"
 
 # Phase 2: File watcher
-notify = "6"
+notify = "8"
 
 # Phase 2: HTTP types for AWS SigV4
-http = "1.1"
+http = "1.5"
 
 # v0.4: Regex for the regex_search tool + glob-to-regex conversion
-regex = "1.11"
+regex = "1.13"
 
 # Platform-specific
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.29", features = ["process", "signal", "user"] }
+nix = { version = "0.31", features = ["process", "signal", "user"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # procfs is Linux-only — it doesn't build on Windows or macOS.
 # Used by `security::monitor` (process enumeration) and `security::network`
 # (listening-socket enumeration).
-procfs = "0.16"
+procfs = "0.18"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = [
+windows = { version = "0.62", features = [
   "Win32_Foundation",
   "Win32_System_Threading",
   "Win32_System_ProcessStatus",

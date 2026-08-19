@@ -1,12 +1,15 @@
 //! Screen capture / OCR.
 //!
-//! v0.3: uses the `screenshots` crate's `Screenshots` (plural) API for
-//! cross-platform capture. The 0.2 release of `screenshots` exposes
-//! `Screenshots::capture() -> Option<Image>`, where `Image::buffer()` already
-//! contains the PNG-encoded bytes (no separate `to_png()` step needed).
+//! v1.1: migrated to the `screenshots` 0.8 `Screen` API. `capture()` now
+//! returns a raw `RgbaImage`, so we PNG-encode via the `image` crate that
+//! `screenshots` re-exports (`screenshots::image`). Region capture now uses
+//! the native `capture_area()` instead of returning the full screen.
 //! OCR is best-effort via `rusty_tesseract` when tesseract is installed.
 
 use serde::{Deserialize, Serialize};
+
+use screenshots::Screen;
+use screenshots::image::{DynamicImage, ImageFormat};
 
 use crate::error::{AegisError, Result};
 
@@ -20,23 +23,28 @@ pub struct Screenshot {
     pub ocr_text: String,
 }
 
-/// Capture the entire primary display.
-pub fn screenshot() -> Result<Screenshot> {
-    let screens = screenshots::Screenshots::all();
-    let screen = screens
+/// Capture the primary display.
+fn primary_screen() -> Result<Screen> {
+    Screen::all()
+        .map_err(|e| AegisError::Internal(format!("display enumeration: {e}")))?
         .into_iter()
         .next()
-        .ok_or_else(|| AegisError::Internal("no display found".into()))?;
+        .ok_or_else(|| AegisError::Internal("no display found".into()))
+}
 
-    let image = screen
-        .capture()
-        .ok_or_else(|| AegisError::Internal("screen capture failed".into()))?;
-
+/// Encode a raw RGBA frame as PNG bytes.
+fn encode_png(image: screenshots::image::RgbaImage) -> Result<(u32, u32, Vec<u8>)> {
     let width = image.width();
     let height = image.height();
-    // The buffer is already PNG-encoded in screenshots 0.2.
-    let png_bytes = image.buffer();
+    let mut png_bytes: Vec<u8> = Vec::new();
+    DynamicImage::ImageRgba8(image)
+        .write_to(&mut std::io::Cursor::new(&mut png_bytes), ImageFormat::Png)
+        .map_err(|e| AegisError::Internal(format!("png encode: {e}")))?;
+    Ok((width, height, png_bytes))
+}
 
+/// Build the final `Screenshot` payload from PNG bytes.
+fn finalize(width: u32, height: u32, png_bytes: Vec<u8>) -> Screenshot {
     let png_base64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &png_bytes);
 
     // OCR text extraction (best-effort)
@@ -50,33 +58,35 @@ pub fn screenshot() -> Result<Screenshot> {
         ocr_text.len()
     );
 
-    Ok(Screenshot {
+    Screenshot {
         width,
         height,
         png_base64,
         ocr_text,
-    })
+    }
+}
+
+/// Capture the entire primary display.
+pub fn screenshot() -> Result<Screenshot> {
+    let screen = primary_screen()?;
+    let image = screen
+        .capture()
+        .map_err(|e| AegisError::Internal(format!("screen capture: {e}")))?;
+    let (width, height, png_bytes) = encode_png(image)?;
+    Ok(finalize(width, height, png_bytes))
 }
 
 /// Capture a specific area of the primary display.
 ///
-/// Note: `screenshots` 0.2 does not expose `capture_area` directly, so we
-/// capture the full screen and crop in software. This is slower but works
-/// across all platforms.
+/// v1.1: uses the native `capture_area()` from `screenshots` 0.8 — no more
+/// full-screen capture + software crop workaround.
 pub fn screenshot_area(x: i32, y: i32, width: u32, height: u32) -> Result<Screenshot> {
-    let full = screenshot()?;
-    // Best-effort crop: just return the full screenshot for now (cropping
-    // requires parsing the PNG, which adds a heavy dependency). The metadata
-    // (x, y, width, height) is preserved in the returned Screenshot.
-    let _ = (x, y);
-    tracing::debug!(
-        "screenshot_area: requested ({},{}) {}x{}, returning full capture",
-        x,
-        y,
-        width,
-        height
-    );
-    Ok(full)
+    let screen = primary_screen()?;
+    let image = screen
+        .capture_area(x, y, width, height)
+        .map_err(|e| AegisError::Internal(format!("area capture: {e}")))?;
+    let (w, h, png_bytes) = encode_png(image)?;
+    Ok(finalize(w, h, png_bytes))
 }
 
 /// Extract text from a PNG image using Tesseract OCR (best-effort).

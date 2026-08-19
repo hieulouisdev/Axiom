@@ -21,12 +21,12 @@ pub mod rate_limiter;
 pub mod safety;
 pub mod screen;
 
-pub use apps::{list_apps, open_app, AppDescriptor};
-pub use automation::{auto_perform, AutoAction};
+pub use apps::{AppDescriptor, list_apps, open_app};
+pub use automation::{AutoAction, auto_perform};
 pub use clipboard::{
-    clipboard_read, clipboard_watch_start, clipboard_watch_stop, clipboard_write, ClipboardContent,
+    ClipboardContent, clipboard_read, clipboard_watch_start, clipboard_watch_stop, clipboard_write,
 };
-pub use commands::{exec_command, ExecResult};
-pub use files::{file_read, file_write, FileReadResult};
+pub use commands::{ExecResult, exec_command};
+pub use files::{FileReadResult, file_read, file_write};
 pub use safety::{ActionRisk, SafetyCheck, SafetyDecision, SafetyPolicy};
 pub use screen::screenshot;

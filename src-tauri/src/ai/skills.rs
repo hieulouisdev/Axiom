@@ -88,7 +88,14 @@ static SKILLS: &[Skill] = &[
         name: "Code Writer",
         description: "Write new code from a natural-language spec. Prefer idiomatic style, complete files, and runnable snippets.",
         system_prompt_fragment: "You are operating in CODE WRITER mode. When the user asks you to write code, produce a complete, runnable solution. Prefer writing the code directly to disk via the `file_write` tool over printing it in chat. Include error handling, comments where non-obvious, and a brief usage example. If the spec is ambiguous, ask one focused clarifying question, then proceed with the most reasonable interpretation.",
-        tool_allowlist: &["file_read", "file_write", "file_list", "shell", "regex_search", "path_glob"],
+        tool_allowlist: &[
+            "file_read",
+            "file_write",
+            "file_list",
+            "shell",
+            "regex_search",
+            "path_glob",
+        ],
         trigger_examples: &[
             "Write a Python script that downloads all images from a webpage.",
             "Create a Rust CLI that parses a CSV file.",
@@ -100,7 +107,13 @@ static SKILLS: &[Skill] = &[
         name: "Code Reviewer",
         description: "Review an existing codebase. Report bugs, security issues, style violations, and improvement opportunities.",
         system_prompt_fragment: "You are operating in CODE REVIEWER mode. Read the user's code via `file_read` (and `regex_search` for cross-cutting concerns), then produce a structured review: (1) Critical issues (bugs, security, data loss), (2) Major issues (design, correctness in edge cases), (3) Minor issues (style, naming, performance), (4) Praise (things done well). For each issue, cite the file + line and suggest a concrete fix. Do not modify code unless the user explicitly asks.",
-        tool_allowlist: &["file_read", "file_list", "regex_search", "path_glob", "shell"],
+        tool_allowlist: &[
+            "file_read",
+            "file_list",
+            "regex_search",
+            "path_glob",
+            "shell",
+        ],
         trigger_examples: &[
             "Review my src/auth module.",
             "Find any SQL injection vulnerabilities in this repo.",
@@ -112,7 +125,14 @@ static SKILLS: &[Skill] = &[
         name: "Refactor",
         description: "Reorganize existing code without changing behavior. Apply well-known patterns and produce a diff.",
         system_prompt_fragment: "You are operating in REFACTOR mode. Before modifying anything, use `file_read` to understand the existing code and `shell` to run the test suite (if present). Propose the refactor as a numbered list of changes, then apply them via `file_write`. After applying, run tests again to verify behavior is unchanged. If a change is risky, ask for confirmation first.",
-        tool_allowlist: &["file_read", "file_write", "file_list", "shell", "regex_search", "diff_apply"],
+        tool_allowlist: &[
+            "file_read",
+            "file_write",
+            "file_list",
+            "shell",
+            "regex_search",
+            "diff_apply",
+        ],
         trigger_examples: &[
             "Extract the auth logic into its own module.",
             "Replace the nested if-else with a match.",
@@ -160,7 +180,14 @@ static SKILLS: &[Skill] = &[
         name: "Sysadmin",
         description: "Shell + system administration: manage services, packages, users, files.",
         system_prompt_fragment: "You are operating in SYSADMIN mode. Use `shell`, `process_list`, `process_kill`, `file_read`, and `file_write` to administer the system. Prefer non-destructive commands first (e.g. `systemctl status` before `systemctl restart`). Always show the user what you're about to run before running it. If a command requires root, surface it for confirmation rather than silently using sudo.",
-        tool_allowlist: &["shell", "process_list", "process_kill", "file_read", "file_write", "http_fetch"],
+        tool_allowlist: &[
+            "shell",
+            "process_list",
+            "process_kill",
+            "file_read",
+            "file_write",
+            "http_fetch",
+        ],
         trigger_examples: &[
             "Why is nginx not starting?",
             "Free up disk space on the root partition.",
@@ -172,7 +199,12 @@ static SKILLS: &[Skill] = &[
         name: "Researcher",
         description: "Web research + summarization. Use `http_fetch` to read URLs and synthesize findings.",
         system_prompt_fragment: "You are operating in RESEARCHER mode. Use `http_fetch` to retrieve web pages, then synthesize findings into a structured report: (1) Key findings, (2) Sources (with URLs), (3) Open questions. Never fabricate sources — if you can't find an authoritative answer, say so. Prefer official documentation, peer-reviewed papers, and primary sources over blog posts.",
-        tool_allowlist: &["http_fetch", "web_search", "memory_remember", "memory_lookup"],
+        tool_allowlist: &[
+            "http_fetch",
+            "web_search",
+            "memory_remember",
+            "memory_lookup",
+        ],
         trigger_examples: &[
             "What are the latest Rust async runtime benchmarks?",
             "Compare Postgres vs MySQL for OLTP workloads.",
@@ -196,7 +228,12 @@ static SKILLS: &[Skill] = &[
         name: "Translator",
         description: "Translate text between any pair of natural languages. Preserve tone, idioms, and formatting.",
         system_prompt_fragment: "You are operating in TRANSLATOR mode. When the user asks for a translation, detect the source language (unless stated), produce a fluent target-language version, and add a brief translator's note for any culturally-specific terms or idioms. Preserve markdown / HTML formatting exactly. If the input is ambiguous, ask one focused question before translating.",
-        tool_allowlist: &["clipboard_read", "clipboard_write", "file_read", "file_write"],
+        tool_allowlist: &[
+            "clipboard_read",
+            "clipboard_write",
+            "file_read",
+            "file_write",
+        ],
         trigger_examples: &[
             "Translate this README to Vietnamese.",
             "Translate 'good morning' to Japanese.",
@@ -232,7 +269,13 @@ static SKILLS: &[Skill] = &[
         name: "Debugger",
         description: "Diagnose and fix bugs. Read logs, run the failing test, propose a fix.",
         system_prompt_fragment: "You are operating in DEBUGGER mode. Start by reproducing the issue: read the failing test or run the command via `shell`. Capture the error output, then form a hypothesis. Use `regex_search` to find related code, `file_read` to inspect it, and propose a fix. Apply the fix via `file_write`, then re-run the test to confirm. If the fix doesn't work, revert and try a different hypothesis — never pile on changes blindly.",
-        tool_allowlist: &["shell", "file_read", "file_write", "regex_search", "process_list"],
+        tool_allowlist: &[
+            "shell",
+            "file_read",
+            "file_write",
+            "regex_search",
+            "process_list",
+        ],
         trigger_examples: &[
             "Why does my test_auth.py fail on CI but pass locally?",
             "Diagnose the panic in src/router.rs line 142.",

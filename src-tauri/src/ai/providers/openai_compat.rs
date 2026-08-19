@@ -196,16 +196,15 @@ impl Provider for OpenAiCompatProvider {
                     if model.is_empty() {
                         model = parsed.model.clone();
                     }
-                    if let Some(choice) = parsed.choices.first() {
-                        if let Some(delta) = choice.delta.as_ref() {
-                            if !delta.content.is_empty() {
-                                full.push_str(&delta.content);
-                                on_chunk(ChatStreamChunk {
-                                    delta: delta.content.clone(),
-                                    done: false,
-                                });
-                            }
-                        }
+                    if let Some(choice) = parsed.choices.first()
+                        && let Some(delta) = choice.delta.as_ref()
+                        && !delta.content.is_empty()
+                    {
+                        full.push_str(&delta.content);
+                        on_chunk(ChatStreamChunk {
+                            delta: delta.content.clone(),
+                            done: false,
+                        });
                     }
                     if let Some(u) = parsed.usage {
                         final_usage = Some(Usage {
@@ -274,16 +273,15 @@ pub async fn parse_sse_stream(
                 if model.is_empty() {
                     model = parsed.model.clone();
                 }
-                if let Some(choice) = parsed.choices.first() {
-                    if let Some(delta) = choice.delta.as_ref() {
-                        if !delta.content.is_empty() {
-                            full.push_str(&delta.content);
-                            on_chunk(ChatStreamChunk {
-                                delta: delta.content.clone(),
-                                done: false,
-                            });
-                        }
-                    }
+                if let Some(choice) = parsed.choices.first()
+                    && let Some(delta) = choice.delta.as_ref()
+                    && !delta.content.is_empty()
+                {
+                    full.push_str(&delta.content);
+                    on_chunk(ChatStreamChunk {
+                        delta: delta.content.clone(),
+                        done: false,
+                    });
                 }
                 if let Some(u) = parsed.usage {
                     final_usage = Some(Usage {

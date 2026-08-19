@@ -112,10 +112,10 @@ impl Provider for OllamaProvider {
                 "top_p": req.top_p.unwrap_or(0.9),
             }
         });
-        if !system_text.is_empty() {
-            if let Some(opts) = body.get_mut("options") {
-                opts["system"] = json!(system_text);
-            }
+        if !system_text.is_empty()
+            && let Some(opts) = body.get_mut("options")
+        {
+            opts["system"] = json!(system_text);
         }
 
         let url = format!("{}/api/chat", self.base_url());

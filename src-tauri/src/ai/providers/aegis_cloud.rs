@@ -192,23 +192,22 @@ impl AegisCloudProvider {
 /// Try to find a preconfigured API key for Aegis Cloud.
 /// Order: env var AEGIS_DEFAULT_API_KEY > env var ZAI_API_KEY > OS keyring.
 fn resolve_preconfigured_key() -> (Option<String>, bool) {
-    if let Ok(k) = std::env::var(ENV_KEY_PRIMARY) {
-        if !k.trim().is_empty() {
-            return (Some(k), true);
-        }
+    if let Ok(k) = std::env::var(ENV_KEY_PRIMARY)
+        && !k.trim().is_empty()
+    {
+        return (Some(k), true);
     }
-    if let Ok(k) = std::env::var(ENV_KEY_ALIAS) {
-        if !k.trim().is_empty() {
-            return (Some(k), true);
-        }
+    if let Ok(k) = std::env::var(ENV_KEY_ALIAS)
+        && !k.trim().is_empty()
+    {
+        return (Some(k), true);
     }
     // Try the OS keyring (the user may have configured a key earlier).
-    if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
-        if let Ok(password) = entry.get_password() {
-            if !password.is_empty() {
-                return (Some(password), true);
-            }
-        }
+    if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+        && let Ok(password) = entry.get_password()
+        && !password.is_empty()
+    {
+        return (Some(password), true);
     }
     (None, false)
 }

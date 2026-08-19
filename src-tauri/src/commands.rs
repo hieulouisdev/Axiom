@@ -12,16 +12,17 @@ use tauri::Emitter;
 use tauri::State;
 
 use crate::{
+    SharedState,
     ai::provider::{ChatMessage, ChatRequest, ChatStreamChunk},
     computer::{
-        apps::{list_apps, open_app, AppDescriptor},
-        automation::{auto_perform, AutoAction},
+        apps::{AppDescriptor, list_apps, open_app},
+        automation::{AutoAction, auto_perform},
         clipboard::{
-            clipboard_read, clipboard_watch_start, clipboard_watch_stop, clipboard_write,
-            ClipboardContent,
+            ClipboardContent, clipboard_read, clipboard_watch_start, clipboard_watch_stop,
+            clipboard_write,
         },
-        commands::{exec_command, ExecResult},
-        files::{file_read, file_write, FileReadResult},
+        commands::{ExecResult, exec_command},
+        files::{FileReadResult, file_read, file_write},
         safety::SafetyPolicy,
         screenshot,
     },
@@ -31,17 +32,15 @@ use crate::{
     memory::{ActivityRecord, Conversation, KnowledgeEntry, Message},
     modes::Mode,
     security::{
-        self,
+        self, DefenseEvent,
         integrity::IntegrityEvent,
         monitor::Threat,
         network::{NetworkAnomaly, SocketInfo},
         quarantine::QuarantineEntry,
         sandbox::SandboxPolicy,
         scanner::ScanResult,
-        DefenseEvent,
     },
     state::AppState,
-    SharedState,
 };
 
 // ===========================================================================
@@ -64,8 +63,8 @@ pub async fn ai_chat(
 ) -> Result<ChatResponseDto> {
     let providers = {
         let s = state.lock();
-        let __moved = (*s.providers.lock()).clone();
-        __moved
+
+        (*s.providers.lock()).clone()
     };
     let router = {
         let s = state.lock();
@@ -207,8 +206,8 @@ pub async fn ai_chat_stream(
 ) -> Result<ChatStreamStartDto> {
     let providers = {
         let s = state.lock();
-        let __moved = (*s.providers.lock()).clone();
-        __moved
+
+        (*s.providers.lock()).clone()
     };
     let router = {
         let s = state.lock();
@@ -381,14 +380,15 @@ pub struct ChatStreamStartDto {
 pub fn ai_chat_cancel(state: State<'_, Arc<Mutex<AppState>>>, stream_id: String) -> Result<()> {
     let s = state.lock();
     let mut tokens = s.cancel_tokens.lock();
-    if let Some(tx) = tokens.remove(&stream_id) {
-        let _ = tx.send(true);
-        tracing::info!("cancelled stream: {}", stream_id);
-        Ok(())
-    } else {
-        Err(AegisError::Internal(format!(
+    match tokens.remove(&stream_id) {
+        Some(tx) => {
+            let _ = tx.send(true);
+            tracing::info!("cancelled stream: {}", stream_id);
+            Ok(())
+        }
+        _ => Err(AegisError::Internal(format!(
             "no active stream with id {stream_id}"
-        )))
+        ))),
     }
 }
 
@@ -482,16 +482,17 @@ pub fn ai_configure_provider(
     // Try to store API key in OS keychain
     if let Some(ref api_key) = cfg.api_key {
         match keyring::Entry::new("aegis-ai", &cfg.provider_id) {
-            Ok(entry) => {
-                if let Err(e) = entry.set_password(api_key) {
+            Ok(entry) => match entry.set_password(api_key) {
+                Err(e) => {
                     tracing::warn!(
                         "keyring store failed for {}, falling back to config: {e}",
                         cfg.provider_id
                     );
-                } else {
+                }
+                _ => {
                     tracing::debug!("stored api_key in keyring for {}", cfg.provider_id);
                 }
-            }
+            },
             Err(e) => {
                 tracing::warn!("keyring entry creation failed for {}: {e}", cfg.provider_id);
             }
@@ -529,8 +530,8 @@ pub async fn ai_test_provider(
 ) -> Result<()> {
     let providers = {
         let s = state.lock();
-        let __moved = (*s.providers.lock()).clone();
-        __moved
+
+        (*s.providers.lock()).clone()
     };
     let provider = providers.get(&provider_id).ok_or_else(|| {
         AegisError::AiNotConfigured(format!("provider '{provider_id}' not registered"))
@@ -576,8 +577,8 @@ pub fn computer_exec_command(
 ) -> Result<ExecResult> {
     let policy = {
         let s = state.lock();
-        let __moved = SafetyPolicy::from_config(&s.config.read());
-        __moved
+
+        SafetyPolicy::from_config(&s.config.read())
     };
     if params.authorized {
         let r = crate::computer::commands::exec_command_authorized(&params.command)?;
@@ -606,8 +607,8 @@ pub fn computer_open_app(
 ) -> Result<()> {
     let policy = {
         let s = state.lock();
-        let __moved = SafetyPolicy::from_config(&s.config.read());
-        __moved
+
+        SafetyPolicy::from_config(&s.config.read())
     };
     if authorized {
         return crate::computer::apps::open_app_authorized(&name);
@@ -639,8 +640,8 @@ pub fn computer_file_write(
 ) -> Result<()> {
     let policy = {
         let s = state.lock();
-        let __moved = SafetyPolicy::from_config(&s.config.read());
-        __moved
+
+        SafetyPolicy::from_config(&s.config.read())
     };
     if params.authorized {
         return crate::computer::files::file_write_authorized(&params.path, &params.content);
@@ -836,8 +837,8 @@ pub async fn memory_summarize(
 ) -> Result<String> {
     let providers = {
         let s = state.lock();
-        let __moved = (*s.providers.lock()).clone();
-        __moved
+
+        (*s.providers.lock()).clone()
     };
     let router = {
         let s = state.lock();
@@ -932,15 +933,15 @@ pub fn security_scan(path: String, max_depth: Option<u32>) -> Result<Vec<ScanRes
 #[tauri::command]
 pub fn security_quarantine_list(state: State<'_, Arc<Mutex<AppState>>>) -> Vec<QuarantineEntry> {
     let s = state.lock();
-    let __moved = s.quarantine.lock().list().to_vec();
-    __moved
+
+    s.quarantine.lock().list().to_vec()
 }
 
 #[tauri::command]
 pub fn security_restore_file(state: State<'_, Arc<Mutex<AppState>>>, id: String) -> Result<()> {
     let s = state.lock();
-    let __moved = s.quarantine.lock().restore(&id);
-    __moved
+
+    s.quarantine.lock().restore(&id)
 }
 
 #[tauri::command]
@@ -982,8 +983,8 @@ pub fn security_network_scan() -> Vec<NetworkAnomaly> {
 #[tauri::command]
 pub fn modes_get_active(state: State<'_, Arc<Mutex<AppState>>>) -> Mode {
     let s = state.lock();
-    let __moved = s.config.read().mode.clone().into();
-    __moved
+
+    s.config.read().mode.clone().into()
 }
 
 #[tauri::command]
@@ -1245,8 +1246,8 @@ pub fn aegis_cloud_configure(
 pub async fn aegis_cloud_test(state: State<'_, Arc<Mutex<AppState>>>) -> Result<()> {
     let providers = {
         let s = state.lock();
-        let __moved = (*s.providers.lock()).clone();
-        __moved
+
+        (*s.providers.lock()).clone()
     };
     let provider = providers
         .get("aegis-cloud")
@@ -1293,7 +1294,9 @@ pub fn bypass_mode_enable(state: State<'_, Arc<Mutex<AppState>>>) -> Result<()> 
         s.router.clone()
     };
     router.refresh();
-    tracing::warn!("bypass mode ENABLED by user — AI will skip safety confirmations except for the irrevocable hard-deny list");
+    tracing::warn!(
+        "bypass mode ENABLED by user — AI will skip safety confirmations except for the irrevocable hard-deny list"
+    );
     Ok(())
 }
 

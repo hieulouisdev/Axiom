@@ -49,11 +49,11 @@ pub fn critical_files() -> Vec<String> {
         // Autostart directory
         if let Some(home) = directories::BaseDirs::new().map(|b| b.home_dir().to_path_buf()) {
             let autostart = home.join(".config/autostart");
-            if autostart.exists() {
-                if let Ok(entries) = std::fs::read_dir(&autostart) {
-                    for entry in entries.flatten() {
-                        files.push(entry.path().to_string_lossy().into_owned());
-                    }
+            if autostart.exists()
+                && let Ok(entries) = std::fs::read_dir(&autostart)
+            {
+                for entry in entries.flatten() {
+                    files.push(entry.path().to_string_lossy().into_owned());
                 }
             }
         }

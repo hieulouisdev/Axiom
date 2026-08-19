@@ -41,12 +41,12 @@
 //! the frontend.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::ai::provider::ChatMessage;
 use crate::computer::{
     apps::list_apps,
-    automation::{auto_perform, AutoAction},
+    automation::{AutoAction, auto_perform},
     clipboard::{clipboard_read, clipboard_write},
     files::file_read,
     safety::{SafetyDecision, SafetyPolicy},

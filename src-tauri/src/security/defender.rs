@@ -21,9 +21,9 @@ use tauri::Emitter;
 
 use crate::state::AppState;
 
+use super::Severity;
 use super::monitor::Threat;
 use super::quarantine::QuarantineStore;
-use super::Severity;
 
 /// A defensive action taken by the system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,16 +79,16 @@ pub async fn start(state: Arc<Mutex<AppState>>) -> anyhow::Result<()> {
         // Drain incoming threats.
         let threats: Vec<Threat> = {
             let mut incoming = INCOMING.lock();
-            let v = incoming.drain(..).collect::<Vec<_>>();
-            v
+
+            incoming.drain(..).collect::<Vec<_>>()
         };
 
         if !threats.is_empty() {
             let (auto_defense, app_handle) = {
                 let s = state.lock();
                 let cfg = s.config.read();
-                let __moved = (cfg.security.auto_defense, s.app_handle.lock().clone());
-                __moved
+
+                (cfg.security.auto_defense, s.app_handle.lock().clone())
             };
 
             for t in threats {
@@ -117,24 +117,24 @@ pub async fn start(state: Arc<Mutex<AppState>>) -> anyhow::Result<()> {
                         }
                         Severity::Medium | Severity::High => {
                             // Try to quarantine the offending binary.
-                            if let Some(bin_path) = process_binary_path(t.pid) {
-                                if let Ok(qp) = quarantine.quarantine(&bin_path) {
-                                    actions.push(DefenseEvent::Quarantined {
-                                        threat_id: t.id.clone(),
-                                        file_path: qp,
-                                    });
-                                }
+                            if let Some(bin_path) = process_binary_path(t.pid)
+                                && let Ok(qp) = quarantine.quarantine(&bin_path)
+                            {
+                                actions.push(DefenseEvent::Quarantined {
+                                    threat_id: t.id.clone(),
+                                    file_path: qp,
+                                });
                             }
                         }
                         Severity::Critical => {
                             // Quarantine + kill the process.
-                            if let Some(bin_path) = process_binary_path(t.pid) {
-                                if let Ok(qp) = quarantine.quarantine(&bin_path) {
-                                    actions.push(DefenseEvent::Quarantined {
-                                        threat_id: t.id.clone(),
-                                        file_path: qp,
-                                    });
-                                }
+                            if let Some(bin_path) = process_binary_path(t.pid)
+                                && let Ok(qp) = quarantine.quarantine(&bin_path)
+                            {
+                                actions.push(DefenseEvent::Quarantined {
+                                    threat_id: t.id.clone(),
+                                    file_path: qp,
+                                });
                             }
                             match kill_process(t.pid) {
                                 Ok(()) => {
@@ -179,8 +179,8 @@ fn process_binary_path(pid: u32) -> Option<String> {
     {
         use windows::Win32::Foundation::CloseHandle;
         use windows::Win32::System::Threading::{
-            OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT,
-            PROCESS_QUERY_LIMITED_INFORMATION,
+            OpenProcess, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION,
+            QueryFullProcessImageNameW,
         };
         unsafe {
             let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
@@ -214,7 +214,7 @@ fn process_binary_path(pid: u32) -> Option<String> {
 
 #[cfg(unix)]
 fn kill_process(pid: u32) -> std::io::Result<()> {
-    use nix::sys::signal::{kill, Signal};
+    use nix::sys::signal::{Signal, kill};
     use nix::unistd::Pid;
     let _ = kill(Pid::from_raw(pid as i32), Signal::SIGTERM);
     Ok(())
@@ -223,7 +223,7 @@ fn kill_process(pid: u32) -> std::io::Result<()> {
 #[cfg(not(unix))]
 fn kill_process(pid: u32) -> std::io::Result<()> {
     use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_TERMINATE, TerminateProcess};
     unsafe {
         let h = OpenProcess(PROCESS_TERMINATE, false, pid)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{e}")))?;

@@ -132,8 +132,8 @@ impl AppState {
 
         let cfg = {
             let s = state.lock();
-            let __moved = s.config.read().clone();
-            __moved
+
+            s.config.read().clone()
         };
 
         let memory = MemoryStore::open(&db_path)?;
@@ -200,15 +200,15 @@ impl AppState {
         // Save initial integrity baseline if none exists
         {
             let baselines = crate::security::integrity::critical_files();
-            if !baselines.is_empty() {
-                if let Ok(saved) = crate::security::integrity::save_baseline() {
-                    tracing::info!("saved integrity baseline for {} files", saved.len());
-                    // Persist to DB
-                    let s = state.lock();
-                    let conn = s.memory.shared_conn();
-                    let conn = conn.lock();
-                    let _ = crate::security::integrity::save_baselines_to_db(&conn);
-                }
+            if !baselines.is_empty()
+                && let Ok(saved) = crate::security::integrity::save_baseline()
+            {
+                tracing::info!("saved integrity baseline for {} files", saved.len());
+                // Persist to DB
+                let s = state.lock();
+                let conn = s.memory.shared_conn();
+                let conn = conn.lock();
+                let _ = crate::security::integrity::save_baselines_to_db(&conn);
             }
         }
 

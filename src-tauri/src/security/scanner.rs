@@ -84,10 +84,10 @@ pub fn scan_file(path: &str) -> Result<ScanResult> {
     }
 
     // Try ClamAV first
-    if clamav_available() {
-        if let Ok(result) = scan_with_clamav(path) {
-            return Ok(result);
-        }
+    if clamav_available()
+        && let Ok(result) = scan_with_clamav(path)
+    {
+        return Ok(result);
     }
 
     // Try Windows Defender on Windows
@@ -231,14 +231,14 @@ fn scan_with_hash(path: &str) -> Result<ScanResult> {
     }
 
     // Try to load additional signatures from ClamAV-style hash files
-    if !result.infected {
-        if let Ok(extra_sigs) = load_extra_signatures() {
-            for (sig_hash, sig_name) in &extra_sigs {
-                if sig_hash.eq_ignore_ascii_case(&result.hash_sha256) {
-                    result.infected = true;
-                    result.signature_name = Some(sig_name.clone());
-                    break;
-                }
+    if !result.infected
+        && let Ok(extra_sigs) = load_extra_signatures()
+    {
+        for (sig_hash, sig_name) in &extra_sigs {
+            if sig_hash.eq_ignore_ascii_case(&result.hash_sha256) {
+                result.infected = true;
+                result.signature_name = Some(sig_name.clone());
+                break;
             }
         }
     }
@@ -263,24 +263,24 @@ fn load_extra_signatures() -> Result<Vec<(String, String)>> {
             .extension()
             .map(|e| e.to_string_lossy().to_string())
             .unwrap_or_default();
-        if ext == "hdb" || ext == "hsb" || ext == "hash" {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                for line in content.lines() {
-                    let line = line.trim();
-                    if line.is_empty() || line.starts_with('#') {
-                        continue;
-                    }
-                    // Format: hash:size:name  or  hash:name
-                    let parts: Vec<&str> = line.split(':').collect();
-                    if parts.len() >= 2 {
-                        let hash = parts[0].to_string();
-                        let name = if parts.len() >= 3 {
-                            parts[2].to_string()
-                        } else {
-                            parts[1].to_string()
-                        };
-                        sigs.push((hash, name));
-                    }
+        if (ext == "hdb" || ext == "hsb" || ext == "hash")
+            && let Ok(content) = std::fs::read_to_string(&path)
+        {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                // Format: hash:size:name  or  hash:name
+                let parts: Vec<&str> = line.split(':').collect();
+                if parts.len() >= 2 {
+                    let hash = parts[0].to_string();
+                    let name = if parts.len() >= 3 {
+                        parts[2].to_string()
+                    } else {
+                        parts[1].to_string()
+                    };
+                    sigs.push((hash, name));
                 }
             }
         }

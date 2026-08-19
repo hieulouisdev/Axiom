@@ -332,10 +332,10 @@ impl ProviderRegistry {
         if std::env::var("AEGIS_DEFAULT_API_KEY").is_ok() || std::env::var("ZAI_API_KEY").is_ok() {
             return true;
         }
-        if let Ok(entry) = keyring::Entry::new("aegis-ai", "aegis-cloud") {
-            if entry.get_password().is_ok() {
-                return true;
-            }
+        if let Ok(entry) = keyring::Entry::new("aegis-ai", "aegis-cloud")
+            && entry.get_password().is_ok()
+        {
+            return true;
         }
         false
     }

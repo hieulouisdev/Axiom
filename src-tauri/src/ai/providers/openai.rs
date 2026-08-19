@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use super::openai_compat::{descriptor, OpenAiCompatProvider};
+use super::openai_compat::{OpenAiCompatProvider, descriptor};
 use crate::ai::provider::{Provider, ProviderCategory};
 
 pub struct OpenAiProvider(Arc<OpenAiCompatProvider>);

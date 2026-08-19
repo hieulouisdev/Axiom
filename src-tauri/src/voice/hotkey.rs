@@ -164,7 +164,9 @@ mod tests {
 
     #[test]
     fn default_hotkey_is_ctrl_space() {
-        std::env::remove_var("AEGIS_PTT_HOTKEY");
+        // SAFETY (edition 2024): this test only touches Aegis-specific env
+        // vars and does not run concurrently with other env-mutating tests.
+        unsafe { std::env::remove_var("AEGIS_PTT_HOTKEY") };
         assert_eq!(default_hotkey(), "Ctrl+Space");
     }
 

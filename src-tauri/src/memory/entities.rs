@@ -303,27 +303,30 @@ mod tests {
     fn extracts_email() {
         let msgs = vec!["Contact me at alice@example.com please".into()];
         let e = extract_from_messages(&msgs);
-        assert!(e
-            .iter()
-            .any(|x| x.kind == "email" && x.value == "alice@example.com"));
+        assert!(
+            e.iter()
+                .any(|x| x.kind == "email" && x.value == "alice@example.com")
+        );
     }
 
     #[test]
     fn extracts_url() {
         let msgs = vec!["Check https://rust-lang.org/ for docs".into()];
         let e = extract_from_messages(&msgs);
-        assert!(e
-            .iter()
-            .any(|x| x.kind == "url" && x.value == "https://rust-lang.org/"));
+        assert!(
+            e.iter()
+                .any(|x| x.kind == "url" && x.value == "https://rust-lang.org/")
+        );
     }
 
     #[test]
     fn extracts_github_repo() {
         let msgs = vec!["PR is at https://github.com/hieulouisdev/Axiom".into()];
         let e = extract_from_messages(&msgs);
-        assert!(e
-            .iter()
-            .any(|x| x.kind == "github_repo" && x.value == "hieulouisdev/Axiom"));
+        assert!(
+            e.iter()
+                .any(|x| x.kind == "github_repo" && x.value == "hieulouisdev/Axiom")
+        );
     }
 
     #[test]
@@ -331,9 +334,10 @@ mod tests {
         let msgs = vec!["Hi, my name is Louis and I live in Hanoi".into()];
         let e = extract_from_messages(&msgs);
         assert!(e.iter().any(|x| x.kind == "name" && x.value == "Louis"));
-        assert!(e
-            .iter()
-            .any(|x| x.kind == "location" && x.value.contains("Hanoi")));
+        assert!(
+            e.iter()
+                .any(|x| x.kind == "location" && x.value.contains("Hanoi"))
+        );
     }
 
     #[test]
@@ -358,18 +362,20 @@ mod tests {
     fn extracts_phone_international() {
         let msgs = vec!["Call me at +1 (415) 555-2671".into()];
         let e = extract_from_messages(&msgs);
-        assert!(e
-            .iter()
-            .any(|x| x.kind == "phone" && x.value.contains("+1")));
+        assert!(
+            e.iter()
+                .any(|x| x.kind == "phone" && x.value.contains("+1"))
+        );
     }
 
     #[test]
     fn extracts_iso_date() {
         let msgs = vec!["Let's meet on 2026-09-15".into()];
         let e = extract_from_messages(&msgs);
-        assert!(e
-            .iter()
-            .any(|x| x.kind == "date" && x.value == "2026-09-15"));
+        assert!(
+            e.iter()
+                .any(|x| x.kind == "date" && x.value == "2026-09-15")
+        );
     }
 
     #[test]

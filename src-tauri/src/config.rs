@@ -336,7 +336,7 @@ pub fn get_credential_secure(provider_id: &str) -> Option<String> {
 pub fn delete_credential_secure(provider_id: &str) -> Result<()> {
     match keyring::Entry::new("aegis-ai", provider_id) {
         Ok(entry) => {
-            match entry.delete_password() {
+            match entry.delete_credential() {
                 Ok(()) => {
                     tracing::debug!("deleted credential for {} from OS keychain", provider_id);
                     Ok(())

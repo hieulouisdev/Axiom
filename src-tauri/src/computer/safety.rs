@@ -600,10 +600,10 @@ fn is_dangerous_app(name: &str) -> bool {
 }
 
 fn expand_tilde(p: &str) -> String {
-    if let Some(rest) = p.strip_prefix("~/") {
-        if let Some(home) = directories::BaseDirs::new().map(|b| b.home_dir().to_path_buf()) {
-            return home.join(rest).to_string_lossy().into_owned();
-        }
+    if let Some(rest) = p.strip_prefix("~/")
+        && let Some(home) = directories::BaseDirs::new().map(|b| b.home_dir().to_path_buf())
+    {
+        return home.join(rest).to_string_lossy().into_owned();
     }
     p.to_string()
 }

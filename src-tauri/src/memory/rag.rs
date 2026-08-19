@@ -16,8 +16,8 @@
 
 use crate::ai::provider::ChatMessage;
 use crate::error::Result;
-use crate::memory::embeddings::EmbeddingStore;
 use crate::memory::KnowledgeEntry;
+use crate::memory::embeddings::EmbeddingStore;
 
 /// Default max number of facts to inject per chat turn.
 pub const DEFAULT_RAG_TOP_K: usize = 5;
@@ -72,12 +72,12 @@ pub fn inject_rag_context(
 
     // Find the first system message and prepend the RAG block to it,
     // so the AI sees both the role description and the facts up-front.
-    if let Some(first) = messages.first_mut() {
-        if matches!(first.role, crate::ai::provider::Role::System) {
-            let new_content = format!("{block}\n\n{}", first.content);
-            first.content = new_content;
-            return Ok(filtered.len());
-        }
+    if let Some(first) = messages.first_mut()
+        && matches!(first.role, crate::ai::provider::Role::System)
+    {
+        let new_content = format!("{block}\n\n{}", first.content);
+        first.content = new_content;
+        return Ok(filtered.len());
     }
     // No system message at the front — insert one.
     messages.insert(0, ChatMessage::system(block));

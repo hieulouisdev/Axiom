@@ -112,8 +112,8 @@ pub async fn run_agent_loop(
 ) -> Result<String> {
     let providers = {
         let s = state.lock();
-        let __moved = (*s.providers.lock()).clone();
-        __moved
+
+        (*s.providers.lock()).clone()
     };
     let router = {
         let s = state.lock();
@@ -364,8 +364,8 @@ async fn agent_loop_inner(
         // Dispatch each tool call locally.
         let policy = {
             let s = state.lock();
-            let __moved = SafetyPolicy::from_config(&s.config.read());
-            __moved
+
+            SafetyPolicy::from_config(&s.config.read())
         };
 
         for call in &tool_calls {

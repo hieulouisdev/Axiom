@@ -17,16 +17,16 @@ pub mod scanner;
 pub mod telemetry;
 pub mod yara;
 
-pub use alerts::{send_alert, AlertConfig};
-pub use defender::{start as start_defender, DefenseEvent};
-pub use integrity::{check_integrity, critical_files, file_hash, save_baseline, IntegrityEvent};
-pub use monitor::{start as start_monitor, ProcessSnapshot, Threat};
-pub use network::{detect_anomalies, NetworkAnomaly, SocketInfo};
+pub use alerts::{AlertConfig, send_alert};
+pub use defender::{DefenseEvent, start as start_defender};
+pub use integrity::{IntegrityEvent, check_integrity, critical_files, file_hash, save_baseline};
+pub use monitor::{ProcessSnapshot, Threat, start as start_monitor};
+pub use network::{NetworkAnomaly, SocketInfo, detect_anomalies};
 pub use quarantine::{QuarantineEntry, QuarantineStore};
 pub use sandbox::SandboxPolicy;
-pub use scanner::{scan_directory, scan_file, ScanResult};
+pub use scanner::{ScanResult, scan_directory, scan_file};
 pub use telemetry::{TelemetryConfig, TelemetryEvent, TelemetrySummary};
-pub use yara::{load_all as load_yara_rules, scan_file as yara_scan_file, YaraRule};
+pub use yara::{YaraRule, load_all as load_yara_rules, scan_file as yara_scan_file};
 
 /// Severity levels shared across the security subsystem.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]

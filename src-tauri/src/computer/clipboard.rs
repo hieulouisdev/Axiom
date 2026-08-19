@@ -83,23 +83,21 @@ fn read_clipboard_text() -> Result<String> {
         if let Ok(output) = std::process::Command::new("xclip")
             .args(["-selection", "clipboard", "-o"])
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                return Ok(String::from_utf8_lossy(&output.stdout).to_string());
-            }
+            return Ok(String::from_utf8_lossy(&output.stdout).to_string());
         }
         if let Ok(output) = std::process::Command::new("xsel")
             .args(["--clipboard", "--output"])
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                return Ok(String::from_utf8_lossy(&output.stdout).to_string());
-            }
+            return Ok(String::from_utf8_lossy(&output.stdout).to_string());
         }
-        if let Ok(output) = std::process::Command::new("wl-paste").output() {
-            if output.status.success() {
-                return Ok(String::from_utf8_lossy(&output.stdout).to_string());
-            }
+        if let Ok(output) = std::process::Command::new("wl-paste").output()
+            && output.status.success()
+        {
+            return Ok(String::from_utf8_lossy(&output.stdout).to_string());
         }
         Err(AegisError::Internal(
             "no clipboard tool available (install xclip, xsel, or wl-paste)".into(),
@@ -143,10 +141,10 @@ fn write_clipboard_text(text: &str) -> Result<()> {
                 let _ = stdin.write_all(text.as_bytes());
                 drop(stdin);
             }
-            if let Ok(status) = child.wait() {
-                if status.success() {
-                    return Ok(());
-                }
+            if let Ok(status) = child.wait()
+                && status.success()
+            {
+                return Ok(());
             }
         }
         // Try xsel
@@ -160,10 +158,10 @@ fn write_clipboard_text(text: &str) -> Result<()> {
                 let _ = stdin.write_all(text.as_bytes());
                 drop(stdin);
             }
-            if let Ok(status) = child.wait() {
-                if status.success() {
-                    return Ok(());
-                }
+            if let Ok(status) = child.wait()
+                && status.success()
+            {
+                return Ok(());
             }
         }
         // Try wl-copy (Wayland)
@@ -176,10 +174,10 @@ fn write_clipboard_text(text: &str) -> Result<()> {
                 let _ = stdin.write_all(text.as_bytes());
                 drop(stdin);
             }
-            if let Ok(status) = child.wait() {
-                if status.success() {
-                    return Ok(());
-                }
+            if let Ok(status) = child.wait()
+                && status.success()
+            {
+                return Ok(());
             }
         }
         Err(AegisError::Internal(

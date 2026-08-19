@@ -56,8 +56,8 @@ pub async fn start(state: Arc<Mutex<AppState>>) -> anyhow::Result<()> {
         // Apply threat signatures.
         let signatures = {
             let s = state.lock();
-            let __moved = s.config.read().security.threat_signatures.clone();
-            __moved
+
+            s.config.read().security.threat_signatures.clone()
         };
 
         let mut new_threats: Vec<Threat> = Vec::new();
@@ -189,7 +189,7 @@ fn sample_processes_inner(out: &mut Vec<ProcessSnapshot>) {
 fn sample_processes_inner(out: &mut Vec<ProcessSnapshot>) {
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
         TH32CS_SNAPPROCESS,
     };
     use windows::Win32::System::Threading::OpenProcess;

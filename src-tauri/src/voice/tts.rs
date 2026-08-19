@@ -373,10 +373,10 @@ fn which_first(candidates: &[&str]) -> Option<String> {
         } else {
             std::process::Command::new("which").arg(c).output().ok()
         };
-        if let Some(o) = out {
-            if o.status.success() {
-                return Some((*c).to_string());
-            }
+        if let Some(o) = out
+            && o.status.success()
+        {
+            return Some((*c).to_string());
         }
     }
     None
@@ -389,8 +389,11 @@ mod tests {
     #[test]
     fn default_tts_returns_local_when_no_env() {
         // Strip env so ElevenLabs is not picked up in CI.
-        std::env::remove_var("ELEVENLABS_API_KEY");
-        std::env::remove_var("AEGIS_TTS_API_KEY");
+        // SAFETY (edition 2024): only Aegis-specific env vars are touched.
+        unsafe {
+            std::env::remove_var("ELEVENLABS_API_KEY");
+            std::env::remove_var("AEGIS_TTS_API_KEY");
+        }
         // Best-effort: keychain may have a stored key from a previous run.
         // We only check the trait method name; we don't run synthesize().
         let tts = default_tts();

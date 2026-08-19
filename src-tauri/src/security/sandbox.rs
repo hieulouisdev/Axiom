@@ -76,12 +76,11 @@ impl SandboxPolicy {
         }
 
         // Check home subdirs if enabled.
-        if self.allow_home_subdirs {
-            if let Some(home) = dirs::home_dir() {
-                if resolved.starts_with(&home) {
-                    return true;
-                }
-            }
+        if self.allow_home_subdirs
+            && let Some(home) = dirs::home_dir()
+            && resolved.starts_with(&home)
+        {
+            return true;
         }
 
         false
