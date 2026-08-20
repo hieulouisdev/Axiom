@@ -104,6 +104,15 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
+      # The frontend dist/ directory MUST exist before `cargo fmt` /
+      # `cargo clippy` / `cargo test` run, because `tauri::generate_context!`
+      # in `lib.rs` reads `frontendDist: "../dist"` at compile time and
+      # panics with a proc-macro error if the directory is missing.
+      # `dist/` is gitignored, so we always rebuild it from source.
+      - name: Build frontend
+        id: frontend
+        run: npm run build
+
       - name: Cargo fmt check
         working-directory: src-tauri
         run: cargo fmt --all -- --check
@@ -116,10 +125,6 @@ jobs:
         if: matrix.label == 'linux'
         working-directory: src-tauri
         run: cargo test --lib --no-fail-fast
-
-      - name: Build frontend
-        id: frontend
-        run: npm run build
 
       - name: Determine release tag
         id: reltag

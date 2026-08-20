@@ -2,6 +2,53 @@
 
 All notable changes to Aegis AI. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.5.0] — 2026-08-20 — CI/CD Repair & Release Pipeline Stabilization
+
+A focused release that repairs the broken GitHub Actions pipeline that was
+blocking every build since v1.3.0. No application code changes — every
+commit on `main` was failing CI because of a single workflow-ordering bug.
+
+### Fixed — CI/CD (critical, was blocking all builds)
+
+- **`cargo clippy` / `cargo test` ran before the frontend was built** —
+  the `tauri::generate_context!()` macro in `src-tauri/src/lib.rs` reads
+  `frontendDist: "../dist"` at compile time and panics with a proc-macro
+  error if the `dist/` directory does not exist. Because `dist/` is
+  `.gitignore`d, CI had to rebuild it from source — but both workflows
+  ran `cargo fmt` / `cargo clippy` / `cargo test` *before* `npm run build`,
+  so every `Lint & Test` job failed at the `Cargo clippy` step with:
+  ```
+  error: proc macro panicked
+     --> src-tauri/src/lib.rs:255:14
+      |
+  255 |         .run(tauri::generate_context!())
+      |              ^^^^^^^^^^^^^^^^^^^^^^^^
+      = help: message: The `frontendDist` configuration is set to "../dist"
+                 but this path doesn't exist
+  ```
+  Both `build-release.yml` and `release.yml` now build the frontend
+  (`npm run build`) immediately after `npm ci` and before any `cargo`
+  command. The `dist/` directory is therefore always present when
+  `generate_context!()` runs, restoring green builds on every push and
+  tag.
+
+### Changed — Release Engineering
+
+- **Version bumped to 1.5.0** across `Cargo.toml` (workspace),
+  `Cargo.lock`, `src-tauri/tauri.conf.json`, and `package.json`. All
+  four version fields are kept in sync to prevent the Tauri bundle
+  version from drifting from the workspace package version.
+
+### Verified
+
+- All 86 Tauri command handlers referenced in `lib.rs::invoke_handler`
+  are defined in `commands.rs` — no missing exports.
+- Frontend `tsc --noEmit` and `vite build` both pass cleanly.
+- `once_cell::sync::Lazy` migration is complete — no remaining
+  references; `LazyLock` is used consistently in all 7 static-init sites.
+- `rust-toolchain.toml` pins Rust 1.97.1, matching the version
+  installed by both workflows via `dtolnay/rust-toolchain@stable`.
+
 ## [1.4.0] — 2026-08-20 — Comprehensive Bug-Fix & Reliability Release
 
 A targeted quality release that fixes 17 identified issues across the
