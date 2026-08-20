@@ -58,7 +58,7 @@ pub fn build_tuned_client() -> Client {
 /// their own client — every call to this function returns the same instance.
 pub fn shared_client() -> Client {
     use std::sync::LazyLock;
-    static SHARED: Lazy<Client> = Lazy::new(build_tuned_client);
+    static SHARED: LazyLock<Client> = LazyLock::new(build_tuned_client);
     SHARED.clone()
 }
 

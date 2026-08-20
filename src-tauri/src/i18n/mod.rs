@@ -70,7 +70,7 @@ impl Locale {
 /// For locales without a backend translation, the frontend ships its own
 /// complete table; the backend `t()` here always returns the English or
 /// Vietnamese string.
-static TABLE: Lazy<HashMap<&'static str, (&'static str, &'static str)>> = Lazy::new(|| {
+static TABLE: LazyLock<HashMap<&'static str, (&'static str, &'static str)>> = LazyLock::new(|| {
     [
         // App
         ("app.name", ("Aegis AI", "Aegis AI")),
@@ -206,7 +206,7 @@ static TABLE: Lazy<HashMap<&'static str, (&'static str, &'static str)>> = Lazy::
 });
 
 /// Process-wide current locale. Defaults to English.
-static CURRENT: Lazy<RwLock<Locale>> = Lazy::new(|| RwLock::new(Locale::En));
+static CURRENT: LazyLock<RwLock<Locale>> = LazyLock::new(|| RwLock::new(Locale::En));
 
 pub fn set_locale(locale: Locale) {
     *CURRENT.write() = locale;
