@@ -19,7 +19,8 @@
 //! env-var fallback). They can also switch to any of the 33+ other providers
 //! at any time.
 
-use std::sync::{Arc, RwLock};
+use parking_lot::RwLock;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use reqwest::Client;
@@ -109,11 +110,11 @@ impl AegisCloudProvider {
 
     /// True when a key was found at construction (env var or keyring).
     pub fn is_preconfigured(&self) -> bool {
-        *self.preconfigured.read().unwrap()
+        *self.preconfigured.read()
     }
 
     fn creds(&self) -> ProviderCreds {
-        self.creds.read().unwrap().clone()
+        self.creds.read().clone()
     }
 
     fn base_url(&self) -> String {
@@ -220,13 +221,13 @@ impl Provider for AegisCloudProvider {
 
     fn set_creds(&self, creds: ProviderCreds) {
         let was_preconfigured = self.is_preconfigured();
-        *self.creds.write().unwrap() = creds;
+        *self.creds.write() = creds;
         // Preserve the preconfigured flag: once we've seen a key at boot, the
         // provider remains "ready" even if the user later clears it (they can
         // always re-set one from the UI).
         if !was_preconfigured {
-            let now_ready = self.creds.read().unwrap().api_key.is_some();
-            *self.preconfigured.write().unwrap() = now_ready;
+            let now_ready = self.creds.read().api_key.is_some();
+            *self.preconfigured.write() = now_ready;
         }
     }
 

@@ -2,6 +2,56 @@
 
 All notable changes to Aegis AI. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.0] — 2026-08-20 — Comprehensive Bug-Fix & Reliability Release
+
+A targeted quality release that fixes 17 identified issues across the
+backend, including 2 logic bugs, a runtime panic risk, RwLock
+inconsistency, and multiple clippy warnings. No new user-facing features.
+
+### Fixed — Logic Bugs (critical)
+
+- **Network listener detection was broken on Linux** —
+  `security/network.rs` compared `procfs::net::TcpState` against
+  `"LISTEN"` (uppercase) but the `Debug` formatter produces `"Listen"`
+  (capital-L). Suspicious listening ports were **never detected**.
+  Fixed the comparison to use `"Listen"`.
+- **Threat signature matching used a fake regex engine** —
+  `security/monitor.rs` had a `regex_lite` module that did substring
+  matching with pipe-based alternation, causing patterns with regex
+  metacharacters to silently fail. Replaced with the real `regex` crate
+  (already a dependency) so all threat signatures work as intended.
+
+### Fixed — Runtime Reliability
+
+- **`default_window_icon().unwrap()` could panic at startup** —
+  if the `icons/` bundle was missing (common in dev), the app crashed
+  immediately. Now gracefully skips tray setup with a warning log.
+- **Double-fail `MemoryStore` retry was misleading** —
+  `state.rs` caught an in-memory SQLite failure and immediately retried
+  the same operation, panicking on the second attempt. Replaced with a
+  single `expect` with a clear message (in-memory SQLite never fails
+  unless the system is critically OOM).
+
+### Changed — Code Quality
+
+- **Replaced `std::sync::RwLock` with `parking_lot::RwLock` in all
+  9 provider files** — `anthropic`, `openai_compat`, `custom`, `bedrock`,
+  `gemini`, `azure_openai`, `ollama`, `replicate`, `aegis_cloud`.
+  `parking_lot::RwLock` never panics on poison and is consistent with
+  the rest of the codebase. All `.read().unwrap()` / `.write().unwrap()`
+  calls removed.
+- **Removed dead `_force_use` hack in `commands.rs`** — replaced with
+  proper unused-import cleanup (`ActivityRecord`, `KnowledgeEntry`,
+  `SocketInfo` removed; remaining types verified as used in signatures).
+- **Removed redundant `drop(s)` in `bypass_mode_status`** — the lock
+  was already dropped at end of scope.
+- **Removed dead `descriptor` field from `CustomOpenAiProvider`** —
+  the field was stored but never read; `descriptor()` now delegates to
+  `self.inner.descriptor()`.
+- **Marked Bedrock provider as `implemented: false`** — the SigV4
+  signing path always returns an error, so the UI correctly shows it
+  as unavailable.
+
 ## [1.3.0] — 2026-08-20 — Rust 1.97.1 Migration & Dependency Cleanup
 
 A maintenance release that modernizes the runtime to Rust 1.97.1,

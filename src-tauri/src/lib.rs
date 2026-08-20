@@ -94,8 +94,16 @@ pub fn run() {
             });
 
             // Setup system tray
+            let icon = match app.default_window_icon().cloned() {
+                Some(icon) => icon,
+                None => {
+                    tracing::warn!("no default window icon found; skipping system tray");
+                    app.manage(app_state_for_setup);
+                    return Ok(());
+                }
+            };
             let _ = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(icon)
                 .tooltip("Aegis AI — Secure AI Assistant")
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {

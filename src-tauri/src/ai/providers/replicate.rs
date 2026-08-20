@@ -3,7 +3,7 @@
 //! Phase 2: Full implementation of the async Prediction API.
 //! POST to create prediction → poll until succeeded/failed → return output.
 
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 use async_trait::async_trait;
 use reqwest::Client;
@@ -54,7 +54,7 @@ impl ReplicateProvider {
     }
 
     fn creds(&self) -> ProviderCreds {
-        self.creds.read().unwrap().clone()
+        self.creds.read().clone()
     }
 
     /// Create a prediction on Replicate.
@@ -154,7 +154,7 @@ impl Provider for ReplicateProvider {
     }
 
     fn set_creds(&self, creds: ProviderCreds) {
-        *self.creds.write().unwrap() = creds;
+        *self.creds.write() = creds;
     }
 
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {

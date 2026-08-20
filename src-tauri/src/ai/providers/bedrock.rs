@@ -4,7 +4,7 @@
 //! Uses the Anthropic Messages API format for Claude models,
 //! and OpenAI-compat format for other models.
 
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 use async_trait::async_trait;
 use serde_json::json;
@@ -38,7 +38,7 @@ impl BedrockProvider {
                 "meta.llama3-1-70b-instruct-v1:0".into(),
                 "mistral.mistral-large-2407-v1:0".into(),
             ],
-            implemented: true,
+            implemented: false,
         };
         std::sync::Arc::new(Self {
             descriptor: desc,
@@ -47,7 +47,7 @@ impl BedrockProvider {
     }
 
     fn creds(&self) -> ProviderCreds {
-        self.creds.read().unwrap().clone()
+        self.creds.read().clone()
     }
 
     /// Build the Bedrock invoke URL:
@@ -136,7 +136,7 @@ impl Provider for BedrockProvider {
     }
 
     fn set_creds(&self, creds: ProviderCreds) {
-        *self.creds.write().unwrap() = creds;
+        *self.creds.write() = creds;
     }
 
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {

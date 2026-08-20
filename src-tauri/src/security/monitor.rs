@@ -60,20 +60,20 @@ pub async fn start(state: Arc<Mutex<AppState>>) -> anyhow::Result<()> {
         let mut new_threats: Vec<Threat> = Vec::new();
         for proc in &snapshot {
             for sig in &signatures {
-                if let Ok(re) = regex_lite::Regex::new(&sig.pattern) {
+                if regex::Regex::new(&sig.pattern).is_ok_and(|re| {
                     let haystack = format!("{} {}", proc.name, proc.command_line);
-                    if re.is_match(&haystack) {
-                        new_threats.push(Threat {
-                            id: format!("threat-{}", uuid::Uuid::new_v4().simple()),
-                            timestamp_ms: now_ms(),
-                            pid: proc.pid,
-                            process_name: proc.name.clone(),
-                            command_line: proc.command_line.clone(),
-                            signature_id: sig.id.clone(),
-                            signature_name: sig.name.clone(),
-                            severity: Severity::High,
-                        });
-                    }
+                    re.is_match(&haystack)
+                }) {
+                    new_threats.push(Threat {
+                        id: format!("threat-{}", uuid::Uuid::new_v4().simple()),
+                        timestamp_ms: now_ms(),
+                        pid: proc.pid,
+                        process_name: proc.name.clone(),
+                        command_line: proc.command_line.clone(),
+                        signature_id: sig.id.clone(),
+                        signature_name: sig.name.clone(),
+                        severity: Severity::High,
+                    });
                 }
             }
         }
@@ -220,37 +220,5 @@ fn sample_processes_inner(out: &mut Vec<ProcessSnapshot>) {
             }
         }
         let _ = CloseHandle(snap);
-    }
-}
-
-/// Lightweight regex implementation. We embed `regex-lite` to avoid pulling in
-/// the full `regex` crate (smaller binary).
-mod regex_lite {
-    pub struct Regex {
-        // Phase 2: use the real `regex` crate. For v0.1 we do substring matching.
-        pattern: String,
-    }
-
-    impl Regex {
-        pub fn new(pattern: &str) -> std::result::Result<Self, ()> {
-            Ok(Self {
-                pattern: pattern.to_string(),
-            })
-        }
-
-        pub fn is_match(&self, haystack: &str) -> bool {
-            // v0.1: simple substring match on each | -separated alternative.
-            let lower_hay = haystack.to_lowercase();
-            for alt in self.pattern.split('|') {
-                let alt = alt.trim();
-                if alt.is_empty() {
-                    continue;
-                }
-                if lower_hay.contains(&alt.to_lowercase()) {
-                    return true;
-                }
-            }
-            false
-        }
     }
 }

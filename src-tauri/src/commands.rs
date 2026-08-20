@@ -29,16 +29,11 @@ use crate::{
     config::{OperatingMode, ProviderCredentials},
     error::{AegisError, Result},
     i18n,
-    memory::{ActivityRecord, Conversation, KnowledgeEntry, Message},
+    memory::{Conversation, Message},
     modes::Mode,
     security::{
-        self, DefenseEvent,
-        integrity::IntegrityEvent,
-        monitor::Threat,
-        network::{NetworkAnomaly, SocketInfo},
-        quarantine::QuarantineEntry,
-        sandbox::SandboxPolicy,
-        scanner::ScanResult,
+        self, DefenseEvent, integrity::IntegrityEvent, monitor::Threat, network::NetworkAnomaly,
+        quarantine::QuarantineEntry, sandbox::SandboxPolicy, scanner::ScanResult,
     },
     state::AppState,
 };
@@ -1268,9 +1263,10 @@ pub fn agent_list_tools() -> serde_json::Value {
 /// Returns whether bypass mode is currently enabled.
 #[tauri::command]
 pub fn bypass_mode_status(state: State<'_, Arc<Mutex<AppState>>>) -> bool {
-    let s = state.lock();
-    let bypass = s.config.read().bypass_mode;
-    drop(s);
+    let bypass = {
+        let s = state.lock();
+        s.config.read().bypass_mode
+    };
     bypass
 }
 
@@ -1495,23 +1491,6 @@ pub async fn calendar_dispatch_intent(
         cal.clone()
     };
     crate::calendar::dispatch_calendar_intent(&message, &client).await
-}
-
-// Silence unused warnings for re-exported types used only in command signatures.
-#[allow(dead_code)]
-fn _force_use(
-    _a: ActivityRecord,
-    _k: KnowledgeEntry,
-    _c: ChatStreamChunk,
-    _t: Threat,
-    _d: DefenseEvent,
-    _p: &dyn std::any::Any,
-    _n: NetworkAnomaly,
-    _s: SocketInfo,
-    _i: IntegrityEvent,
-    _cl: ClipboardContent,
-    _pa: PendingAction,
-) {
 }
 
 // ===========================================================================

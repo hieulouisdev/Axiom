@@ -58,7 +58,7 @@ pub fn detect_anomalies() -> Vec<NetworkAnomaly> {
 
     for socket in &sockets {
         // Check for suspicious listening ports
-        if (socket.state == "LISTEN" || socket.state.contains("LISTEN"))
+        if (socket.state == "Listen" || socket.state.contains("Listen"))
             && SUSPICIOUS_PORTS.contains(&socket.local_port)
         {
             anomalies.push(NetworkAnomaly {

@@ -1,6 +1,6 @@
 //! Google Gemini — Gemini 1.5 Pro / Flash via generateContent API.
 
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 use async_trait::async_trait;
 use reqwest::Client;
@@ -49,7 +49,7 @@ impl GeminiProvider {
     }
 
     fn creds(&self) -> ProviderCreds {
-        self.creds.read().unwrap().clone()
+        self.creds.read().clone()
     }
 
     fn base_url(&self) -> String {
@@ -74,7 +74,7 @@ impl Provider for GeminiProvider {
         &self.descriptor
     }
     fn set_creds(&self, creds: ProviderCreds) {
-        *self.creds.write().unwrap() = creds;
+        *self.creds.write() = creds;
     }
 
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {

@@ -3,7 +3,7 @@
 //! Uses Ollama's native `/api/chat` endpoint. Also supports the
 //! OpenAI-compatible `/v1/chat/completions` endpoint exposed since 0.1.x.
 
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 use async_trait::async_trait;
 use reqwest::Client;
@@ -56,7 +56,7 @@ impl OllamaProvider {
     }
 
     fn creds(&self) -> ProviderCreds {
-        self.creds.read().unwrap().clone()
+        self.creds.read().clone()
     }
 
     fn base_url(&self) -> String {
@@ -74,7 +74,7 @@ impl Provider for OllamaProvider {
         &self.descriptor
     }
     fn set_creds(&self, creds: ProviderCreds) {
-        *self.creds.write().unwrap() = creds;
+        *self.creds.write() = creds;
     }
 
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {

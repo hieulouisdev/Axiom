@@ -9,8 +9,8 @@
 //!   `{"text": "..."}` field (lets users connect custom backends like n8n,
 //!   Zapier, or self-hosted servers).
 
+use parking_lot::RwLock;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 use async_trait::async_trait;
 use reqwest::Client;
@@ -27,7 +27,6 @@ use crate::error::{AegisError, Result};
 // ============================================================================
 
 pub struct CustomOpenAiProvider {
-    descriptor: ProviderDescriptor,
     creds: RwLock<ProviderCreds>,
     inner: Arc<crate::ai::providers::openai_compat::OpenAiCompatProvider>,
 }
@@ -48,7 +47,6 @@ impl CustomOpenAiProvider {
             true,
         );
         Arc::new(Self {
-            descriptor: desc.clone(),
             creds: RwLock::new(ProviderCreds::default()),
             inner: Arc::new(crate::ai::providers::openai_compat::OpenAiCompatProvider::new(desc)),
         })
@@ -58,14 +56,14 @@ impl CustomOpenAiProvider {
 #[async_trait]
 impl Provider for CustomOpenAiProvider {
     fn descriptor(&self) -> &ProviderDescriptor {
-        &self.descriptor
+        self.inner.descriptor()
     }
     fn set_creds(&self, creds: ProviderCreds) {
         self.inner.set_creds(creds.clone());
-        *self.creds.write().unwrap() = creds;
+        *self.creds.write() = creds;
     }
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {
-        let base_url = self.creds.read().unwrap().base_url.clone();
+        let base_url = self.creds.read().base_url.clone();
         if base_url.is_none() {
             return Err(AegisError::AiNotConfigured(
                 "custom OpenAI-compatible provider requires a base URL".into(),
@@ -74,7 +72,7 @@ impl Provider for CustomOpenAiProvider {
         self.inner.chat(req).await
     }
     async fn ping(&self) -> Result<()> {
-        let base_url = self.creds.read().unwrap().base_url.clone();
+        let base_url = self.creds.read().base_url.clone();
         if base_url.is_none() {
             return Err(AegisError::AiNotConfigured(
                 "custom OpenAI-compatible provider requires a base URL".into(),
@@ -115,7 +113,7 @@ impl CustomAnthropicProvider {
     }
 
     fn creds(&self) -> ProviderCreds {
-        self.creds.read().unwrap().clone()
+        self.creds.read().clone()
     }
 }
 
@@ -125,7 +123,7 @@ impl Provider for CustomAnthropicProvider {
         &self.descriptor
     }
     fn set_creds(&self, creds: ProviderCreds) {
-        *self.creds.write().unwrap() = creds;
+        *self.creds.write() = creds;
     }
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {
         let creds = self.creds();
@@ -211,7 +209,7 @@ pub struct CustomOllamaProvider {
 
 impl CustomOllamaProvider {
     fn creds(&self) -> ProviderCreds {
-        self.creds.read().unwrap().clone()
+        self.creds.read().clone()
     }
 
     pub fn new() -> Arc<Self> {
@@ -241,7 +239,7 @@ impl Provider for CustomOllamaProvider {
         &self.descriptor
     }
     fn set_creds(&self, creds: ProviderCreds) {
-        *self.creds.write().unwrap() = creds;
+        *self.creds.write() = creds;
     }
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {
         let creds = self.creds();
@@ -319,7 +317,7 @@ pub struct WebhookProvider {
 
 impl WebhookProvider {
     fn creds(&self) -> ProviderCreds {
-        self.creds.read().unwrap().clone()
+        self.creds.read().clone()
     }
 
     pub fn new() -> Arc<Self> {
@@ -350,7 +348,7 @@ impl Provider for WebhookProvider {
         &self.descriptor
     }
     fn set_creds(&self, creds: ProviderCreds) {
-        *self.creds.write().unwrap() = creds;
+        *self.creds.write() = creds;
     }
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {
         let creds = self.creds();
