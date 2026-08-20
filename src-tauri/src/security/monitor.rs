@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::state::AppState;
 
 use super::Severity;
+use std::sync::LazyLock;
 
 /// Snapshot of a single running process.
 #[derive(Debug, Clone, Serialize, Deserialize)]

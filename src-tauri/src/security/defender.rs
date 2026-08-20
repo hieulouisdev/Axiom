@@ -24,6 +24,7 @@ use crate::state::AppState;
 use super::Severity;
 use super::monitor::Threat;
 use super::quarantine::QuarantineStore;
+use std::sync::LazyLock;
 
 /// A defensive action taken by the system.
 #[derive(Debug, Clone, Serialize, Deserialize)]

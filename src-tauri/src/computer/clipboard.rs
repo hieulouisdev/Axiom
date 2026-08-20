@@ -7,6 +7,7 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AegisError, Result};
+use std::sync::LazyLock;
 
 /// Result of reading the clipboard.
 #[derive(Debug, Clone, Serialize, Deserialize)]

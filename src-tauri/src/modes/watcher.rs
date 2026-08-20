@@ -9,6 +9,7 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
+use std::sync::LazyLock;
 
 /// A file system change event.
 #[derive(Debug, Clone, Serialize, Deserialize)]

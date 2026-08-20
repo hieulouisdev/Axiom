@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::{AegisError, Result};
+use std::sync::LazyLock;
 
 /// An integrity check event (file changed / new / missing).
 #[derive(Debug, Clone, Serialize, Deserialize)]
