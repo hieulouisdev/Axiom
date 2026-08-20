@@ -2,6 +2,54 @@
 
 All notable changes to Aegis AI. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] — 2026-08-20 — CI Fix & Code Cleanup
+
+A targeted patch release that fixes the GitHub Actions CI pipeline and
+cleans up dead code flagged by clippy. No new user-facing features;
+all changes are internal quality and reliability improvements.
+
+### Fixed — GitHub Actions (critical)
+
+- **`build-release.yml` created releases on every push to `main`** —
+  the `build-linux` and `build-windows` jobs ran on ALL pushes, not just
+  tag pushes. The `tauri-action` step would attempt to create a GitHub
+  release with `tagName: "main"` on regular code pushes, producing
+  incorrect releases. Added `if: startsWith(github.ref, 'refs/tags/')`
+  to both build jobs so releases are only created when a version tag
+  (e.g. `v1.2.0`) is pushed. The `lint-and-test` job continues to run
+  on every push to `main` as a quality gate.
+- **`release.yml` build summary could fail** — the `find` command in
+  the build summary step was not guarded against missing directories.
+  Added `2>/dev/null || true` to prevent the summary from failing when
+  bundle directories don't exist.
+
+### Fixed — Rust backend
+
+- **`ai/tools.rs` dead code block** — a no-op `if let` block binding
+  `AEGIS_CONFIG_PATH` and immediately discarding it was removed. This was
+  flagged by clippy as useless code.
+- **`security/monitor.rs` unused imports** — `HashMap` and `AppHandle`
+  were imported at the module level but only referenced by dead-code
+  suppressor functions that have now been removed. Both imports are
+  cleaned up.
+- **`security/monitor.rs` dead-code suppressor functions** —
+  `_force_use_of_apphandle` and `_force_use_of_hashmap` were removed;
+  they served no purpose after the unused imports were cleaned.
+- **`security/monitor.rs` unused `OpenProcess` import** — the Windows
+  code path in `sample_processes_inner` imported `OpenProcess` from
+  the `windows` crate but never called it. The import is removed.
+- **`ai/providers/openai_compat.rs` dead-code suppressor function** —
+  `_suppress_unused_serialize_warning` was removed along with its
+  `#[allow(unused)]` annotation.
+
+### Changed
+
+- **Version bumped to 1.2.0** across `Cargo.toml` (workspace),
+  `package.json`, and `src-tauri/tauri.conf.json`.
+- Frontend and backend codebases verified clean: `cargo fmt --check`
+  passes, `npm run build` produces valid output, `npx tsc --noEmit`
+  passes with zero errors.
+
 ## [1.1.0] — 2026-08-19 — Toolchain & Dependency Modernization
 
 A full-stack upgrade release built on **Rust 1.97.1**. Every major

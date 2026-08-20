@@ -403,9 +403,3 @@ impl Provider for StubProvider {
         )))
     }
 }
-
-#[allow(unused)]
-fn _suppress_unused_serialize_warning() {
-    // Re-export so that `Serialize` is referenced.
-    let _ = serde_json::to_string(&Role::User).unwrap();
-}

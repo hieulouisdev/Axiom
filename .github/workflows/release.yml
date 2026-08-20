@@ -222,4 +222,4 @@ jobs:
             echo '```'
             find target src-tauri/target -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*.msi' -o -name '*.exe' \) 2>/dev/null | head -20 || true
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true

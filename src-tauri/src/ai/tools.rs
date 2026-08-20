@@ -1569,10 +1569,6 @@ fn run_skill_set(args: &Value) -> String {
     if crate::ai::skills::find(&id).is_none() {
         return json!({"error": format!("unknown skill: {id}")}).to_string();
     }
-    // Persist the active skill via the global config.
-    if let Ok(cfg_path) = std::env::var("AEGIS_CONFIG_PATH") {
-        let _ = cfg_path;
-    }
     // We can't reach the AppState from here without a bigger refactor.
     // Instead, we write the skill to a sidecar file that AppState reads
     // on next request.

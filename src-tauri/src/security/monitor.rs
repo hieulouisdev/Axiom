@@ -1,13 +1,11 @@
 //! Process monitor: periodically samples running processes on the host and
 //! flags those whose command line matches a threat signature.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
 
 use crate::state::AppState;
 
@@ -192,7 +190,6 @@ fn sample_processes_inner(out: &mut Vec<ProcessSnapshot>) {
         CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
         TH32CS_SNAPPROCESS,
     };
-    use windows::Win32::System::Threading::OpenProcess;
 
     unsafe {
         let snap = match CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) {
@@ -258,8 +255,3 @@ mod regex_lite {
         }
     }
 }
-
-#[allow(dead_code)]
-fn _force_use_of_apphandle(_h: AppHandle) {}
-#[allow(dead_code)]
-fn _force_use_of_hashmap(_h: HashMap<String, String>) {}
