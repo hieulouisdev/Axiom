@@ -155,29 +155,28 @@ fn enumerate_sockets_windows(sockets: &mut Vec<SocketInfo>) -> Result<()> {
     if let Ok(output) = std::process::Command::new("netstat")
         .args(["-ano", "-p", "TCP"])
         .output()
+        && output.status.success()
     {
-        if output.status.success() {
-            let text = String::from_utf8_lossy(&output.stdout);
-            for line in text.lines().skip(4) {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() >= 5 {
-                    let local = parts[1];
-                    let remote = parts[2];
-                    let state = parts[3];
-                    let pid: Option<u32> = parts[4].parse().ok();
+        let text = String::from_utf8_lossy(&output.stdout);
+        for line in text.lines().skip(4) {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 5 {
+                let local = parts[1];
+                let remote = parts[2];
+                let state = parts[3];
+                let pid: Option<u32> = parts[4].parse().ok();
 
-                    let (local_addr, local_port) = parse_addr(local);
-                    let (remote_addr, remote_port) = parse_addr(remote);
+                let (local_addr, local_port) = parse_addr(local);
+                let (remote_addr, remote_port) = parse_addr(remote);
 
-                    sockets.push(SocketInfo {
-                        local_addr,
-                        local_port,
-                        remote_addr,
-                        remote_port,
-                        state: state.to_string(),
-                        pid,
-                    });
-                }
+                sockets.push(SocketInfo {
+                    local_addr,
+                    local_port,
+                    remote_addr,
+                    remote_port,
+                    state: state.to_string(),
+                    pid,
+                });
             }
         }
     }

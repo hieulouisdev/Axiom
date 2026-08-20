@@ -225,16 +225,13 @@ fn kill_process(pid: u32) -> std::io::Result<()> {
     use windows::Win32::System::Threading::{OpenProcess, PROCESS_TERMINATE, TerminateProcess};
     unsafe {
         let h = OpenProcess(PROCESS_TERMINATE, false, pid)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{e}")))?;
+            .map_err(|e| std::io::Error::other(format!("{e}")))?;
         let r = TerminateProcess(h, 1).ok();
         let _ = CloseHandle(h);
         // `.ok()` converts Result -> Option, so check `.is_none()` instead
         // of `.is_err()`.
         if r.is_none() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "TerminateProcess failed",
-            ));
+            return Err(std::io::Error::other("TerminateProcess failed"));
         }
         Ok(())
     }

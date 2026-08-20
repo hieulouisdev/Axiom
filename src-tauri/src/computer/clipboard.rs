@@ -108,10 +108,9 @@ fn read_clipboard_text() -> Result<String> {
         if let Ok(output) = std::process::Command::new("powershell")
             .args(["-NoProfile", "-Command", "Get-Clipboard"])
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                return Ok(String::from_utf8_lossy(&output.stdout).to_string());
-            }
+            return Ok(String::from_utf8_lossy(&output.stdout).to_string());
         }
         Err(AegisError::Internal(
             "clipboard read failed on Windows".into(),
@@ -193,10 +192,9 @@ fn write_clipboard_text(text: &str) -> Result<()> {
                 &format!("Set-Clipboard -Value '{}'", text.replace('\'', "''")),
             ])
             .status()
+            && status.success()
         {
-            if status.success() {
-                return Ok(());
-            }
+            return Ok(());
         }
         Err(AegisError::Internal(
             "clipboard write failed on Windows".into(),

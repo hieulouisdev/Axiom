@@ -67,11 +67,11 @@ pub fn critical_files() -> Vec<String> {
         if let Some(appdata) = std::env::var_os("APPDATA") {
             let startup =
                 PathBuf::from(&appdata).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
-            if startup.exists() {
-                if let Ok(entries) = std::fs::read_dir(&startup) {
-                    for entry in entries.flatten() {
-                        files.push(entry.path().to_string_lossy().into_owned());
-                    }
+            if startup.exists()
+                && let Ok(entries) = std::fs::read_dir(&startup)
+            {
+                for entry in entries.flatten() {
+                    files.push(entry.path().to_string_lossy().into_owned());
                 }
             }
         }
