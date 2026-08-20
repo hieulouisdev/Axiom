@@ -52,12 +52,10 @@ pub enum DefenseEvent {
 }
 
 /// Channel of incoming threats from the monitor.
-static INCOMING: LazyLock<Mutex<Vec<Threat>>> =
-    LazyLock::new(|| Mutex::new(Vec::new()));
+static INCOMING: LazyLock<Mutex<Vec<Threat>>> = LazyLock::new(|| Mutex::new(Vec::new()));
 
 /// Latest defense events (kept for the UI).
-static EVENTS: LazyLock<Mutex<Vec<DefenseEvent>>> =
-    LazyLock::new(|| Mutex::new(Vec::new()));
+static EVENTS: LazyLock<Mutex<Vec<DefenseEvent>>> = LazyLock::new(|| Mutex::new(Vec::new()));
 
 /// Notify the defender that new threats were detected.
 pub async fn notify_threats(threats: Vec<Threat>) {

@@ -35,12 +35,10 @@ pub struct Threat {
 }
 
 /// Latest snapshot of all running processes (refreshed every poll interval).
-static LATEST: LazyLock<Mutex<Vec<ProcessSnapshot>>> =
-    LazyLock::new(|| Mutex::new(Vec::new()));
+static LATEST: LazyLock<Mutex<Vec<ProcessSnapshot>>> = LazyLock::new(|| Mutex::new(Vec::new()));
 
 /// Recent threats detected by the monitor.
-static RECENT_THREATS: LazyLock<Mutex<Vec<Threat>>> =
-    LazyLock::new(|| Mutex::new(Vec::new()));
+static RECENT_THREATS: LazyLock<Mutex<Vec<Threat>>> = LazyLock::new(|| Mutex::new(Vec::new()));
 
 /// Starts the monitor loop. Runs forever until the process exits.
 pub async fn start(state: Arc<Mutex<AppState>>) -> anyhow::Result<()> {

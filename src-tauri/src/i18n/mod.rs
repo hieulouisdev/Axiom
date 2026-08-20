@@ -12,9 +12,9 @@
 
 use std::collections::HashMap;
 
-use std::sync::LazyLock;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
 
 /// Supported UI locales.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
