@@ -1263,11 +1263,8 @@ pub fn agent_list_tools() -> serde_json::Value {
 /// Returns whether bypass mode is currently enabled.
 #[tauri::command]
 pub fn bypass_mode_status(state: State<'_, Arc<Mutex<AppState>>>) -> bool {
-    let bypass = {
-        let s = state.lock();
-        s.config.read().bypass_mode
-    };
-    bypass
+    let s = state.lock();
+    s.config.read().bypass_mode
 }
 
 /// Enable bypass mode — the AI will skip the safety confirmation prompt for
