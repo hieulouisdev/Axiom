@@ -15,10 +15,17 @@
 //! v0.6 adds:
 //! - [`web`] — real web search (DuckDuckGo HTML endpoint) and HTML readability
 //!   extraction. The `web_search` tool is no longer a stub.
+//!
+//! v1.6 adds:
+//! - [`orchestrator`] — multi-agent DAG planner/executor that decomposes a
+//!   high-level goal into topologically-sorted steps, dispatches independent
+//!   branches concurrently up to `orchestrator_max_parallel`, and emits
+//!   per-step Tauri events for live UI progress.
 
 pub mod agent;
 pub mod catalog;
 pub mod fast_path;
+pub mod orchestrator;
 pub mod provider;
 pub mod providers;
 pub mod router;

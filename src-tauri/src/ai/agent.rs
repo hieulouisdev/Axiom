@@ -77,6 +77,14 @@ pub struct AgentRunParams {
     /// Max tool-use iterations before the loop gives up.
     /// Capped to [`ABSOLUTE_MAX_ITERATIONS`].
     pub max_iterations: Option<u32>,
+    /// v1.6.0 — Per-run skill override. If `Some`, the agent loop uses this
+    /// skill's `system_prompt_fragment` instead of reading the `active_skill`
+    /// sidecar file. Lets the orchestrator run multiple steps with different
+    /// skills concurrently without races on the shared sidecar file.
+    /// Frontends that omit this field still work — `None` falls back to the
+    /// sidecar file (the pre-v1.6 behavior).
+    #[serde(default)]
+    pub skill: Option<String>,
 }
 
 /// Final result of an agent run.
@@ -219,11 +227,20 @@ async fn agent_loop_inner(
 
     // Inject the system prompt that explains the agent's role.
     let skill_fragment = {
-        let path = crate::config::AppConfig::data_dir().join("active_skill");
-        std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| crate::ai::skills::find(s.trim()).map(|sk| sk.system_prompt_fragment))
-            .unwrap_or("")
+        // v1.6.0: prefer an inline `skill` override if the caller (e.g. the
+        // orchestrator) provided one. Otherwise fall back to the persistent
+        // `active_skill` sidecar file written by the Settings UI.
+        if let Some(skill_id) = params.skill.as_deref()
+            && let Some(sk) = crate::ai::skills::find(skill_id)
+        {
+            sk.system_prompt_fragment
+        } else {
+            let path = crate::config::AppConfig::data_dir().join("active_skill");
+            std::fs::read_to_string(&path)
+                .ok()
+                .and_then(|s| crate::ai::skills::find(s.trim()).map(|sk| sk.system_prompt_fragment))
+                .unwrap_or("")
+        }
     };
     let system_prompt = format!(
         "You are Aegis AI, a secure cross-platform assistant with full \

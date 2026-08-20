@@ -1345,27 +1345,42 @@ pub fn skills_list() -> &'static [crate::ai::skills::Skill] {
     crate::ai::skills::all_skills()
 }
 
-/// Returns the currently active skill id (read from the sidecar file).
+/// Returns the currently active skill id.
+///
+/// v1.6: reads from `AppConfig::active_skill` (the schema v2 field) instead
+/// of the legacy `data_dir/active_skill` sidecar text file.
 #[tauri::command]
-pub fn skills_active() -> Option<String> {
-    let path = crate::config::AppConfig::data_dir().join("active_skill");
-    std::fs::read_to_string(&path)
-        .ok()
-        .map(|s| s.trim().to_string())
+pub fn skills_active(state: State<'_, SharedState>) -> Option<String> {
+    let s = state.lock();
+    s.config.read().active_skill.clone()
 }
 
 /// Set the active skill by id. The agent loop will inject its prompt fragment.
+///
+/// v1.6: writes to `AppConfig::active_skill` and persists via
+/// `ConfigStore::persist()`. Falls back to writing the sidecar file if the
+/// config store is unavailable, so legacy tooling keeps working.
 #[tauri::command]
-pub fn skills_set(id: String) -> Result<()> {
+pub fn skills_set(state: State<'_, SharedState>, id: String) -> Result<()> {
     if crate::ai::skills::find(&id).is_none() {
         return Err(AegisError::Config(format!("unknown skill: {id}")));
     }
-    let path = crate::config::AppConfig::data_dir().join("active_skill");
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).ok();
+    {
+        let s = state.lock();
+        {
+            let mut cfg = s.config.write();
+            cfg.active_skill = Some(id.clone());
+        }
+        if let Err(e) = s.config.persist() {
+            tracing::warn!("failed to persist config: {e}; writing sidecar fallback");
+            let path = crate::config::AppConfig::data_dir().join("active_skill");
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).ok();
+            }
+            std::fs::write(&path, &id)
+                .map_err(|e| AegisError::Io(format!("failed to write active_skill: {e}")))?;
+        }
     }
-    std::fs::write(&path, &id)
-        .map_err(|e| AegisError::Io(format!("failed to write active_skill: {e}")))?;
     Ok(())
 }
 
@@ -1862,4 +1877,391 @@ pub fn telemetry_opt_out(state: State<'_, SharedState>) -> std::result::Result<(
     let mut cfg = s.telemetry.lock();
     cfg.opt_out();
     Ok(())
+}
+
+// ===========================================================================
+// v1.6.0 — Multi-Agent Orchestrator
+// ===========================================================================
+
+/// DTO for `orchestrator_run_plan` — the user supplies a goal; the
+/// orchestrator drafts a plan, optionally refines it via the AI, registers
+/// it, and starts execution in a background task.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrchestratorRunParams {
+    pub goal: String,
+    /// Whether to ask the AI to refine the deterministic draft. `false`
+    /// skips the AI call and uses the draft verbatim (useful when offline).
+    #[serde(default = "default_true")]
+    pub refine_with_ai: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Run an orchestration plan for a goal. Returns the `plan_id` immediately
+/// so the UI can subscribe to `orchestrator://*` events for live progress.
+#[tauri::command]
+pub async fn orchestrator_run_plan(
+    state: State<'_, SharedState>,
+    app: tauri::AppHandle,
+    params: OrchestratorRunParams,
+) -> Result<String> {
+    let (orchestrator, router, providers, state_for_task) = {
+        let s = state.lock();
+        (
+            s.orchestrator.clone(),
+            s.router.clone(),
+            s.providers.lock().clone(),
+            state.inner().clone(),
+        )
+    };
+
+    // Draft a deterministic plan.
+    let draft = orchestrator.draft_plan(&params.goal);
+
+    // Optionally refine it via the active AI provider.
+    let plan = if params.refine_with_ai {
+        orchestrator
+            .refine_plan_with_ai(draft, &router, &providers)
+            .await
+    } else {
+        draft
+    };
+
+    let plan_id = orchestrator.register(plan);
+    let plan_id_for_return = plan_id.clone();
+    let orch = orchestrator.clone();
+    let app_clone = app.clone();
+    tokio::spawn(async move {
+        if let Err(e) = orch.execute(plan_id, &app_clone, state_for_task).await {
+            tracing::error!("orchestrator plan execution failed: {e:#}");
+        }
+    });
+    Ok(plan_id_for_return)
+}
+
+/// Get the current state of a plan by id.
+#[tauri::command]
+pub fn orchestrator_get_plan(
+    state: State<'_, SharedState>,
+    plan_id: String,
+) -> Result<Option<crate::ai::orchestrator::Plan>> {
+    let s = state.lock();
+    Ok(s.orchestrator.get(&plan_id))
+}
+
+/// List all known plans (most recent first by insertion order).
+#[tauri::command]
+pub fn orchestrator_list_plans(
+    state: State<'_, SharedState>,
+) -> Result<Vec<crate::ai::orchestrator::Plan>> {
+    let s = state.lock();
+    Ok(s.orchestrator.list())
+}
+
+/// Cancel a running plan.
+#[tauri::command]
+pub fn orchestrator_cancel(state: State<'_, SharedState>, plan_id: String) -> Result<bool> {
+    let s = state.lock();
+    Ok(s.orchestrator.cancel(&plan_id))
+}
+
+// ===========================================================================
+// v1.6.0 — Workflow Engine
+// ===========================================================================
+
+/// Register or replace a workflow definition.
+#[tauri::command]
+pub fn workflow_upsert(
+    state: State<'_, SharedState>,
+    workflow: crate::workflow::Workflow,
+) -> Result<String> {
+    let s = state.lock();
+    if !s.config.read().workflow_engine {
+        return Err(AegisError::Config("workflow engine disabled".into()));
+    }
+    Ok(s.workflow.upsert(workflow))
+}
+
+/// Delete a workflow.
+#[tauri::command]
+pub fn workflow_delete(state: State<'_, SharedState>, workflow_id: String) -> Result<bool> {
+    let s = state.lock();
+    Ok(s.workflow.delete(&workflow_id))
+}
+
+/// Get a workflow by id.
+#[tauri::command]
+pub fn workflow_get(
+    state: State<'_, SharedState>,
+    workflow_id: String,
+) -> Result<Option<crate::workflow::Workflow>> {
+    let s = state.lock();
+    Ok(s.workflow.get(&workflow_id))
+}
+
+/// List all registered workflows.
+#[tauri::command]
+pub fn workflow_list(state: State<'_, SharedState>) -> Result<Vec<crate::workflow::Workflow>> {
+    let s = state.lock();
+    Ok(s.workflow.list())
+}
+
+/// Run a workflow. Returns the `run_id` immediately. Subscribe to
+/// `workflow://*` events for live progress.
+#[tauri::command]
+pub async fn workflow_run(
+    state: State<'_, SharedState>,
+    app: tauri::AppHandle,
+    workflow_id: String,
+) -> Result<String> {
+    let (engine, workflow_enabled, state_for_task) = {
+        let s = state.lock();
+        (
+            s.workflow.clone(),
+            s.config.read().workflow_engine,
+            state.inner().clone(),
+        )
+    };
+    if !workflow_enabled {
+        return Err(AegisError::Config("workflow engine disabled".into()));
+    }
+    // Make sure the workflow exists before spawning.
+    if engine.get(&workflow_id).is_none() {
+        return Err(AegisError::Config(format!(
+            "workflow not found: {workflow_id}"
+        )));
+    }
+    let engine_arc = engine.clone();
+    let state_for_complete = state_for_task.clone();
+    let app_clone = app.clone();
+    // Enqueue the run as a background task so the UI sees it in the task list.
+    let (task_id, _flag) = {
+        let s = state.lock();
+        s.tasks
+            .enqueue("workflow_run", Some(format!("workflow: {workflow_id}")))
+    };
+    let task_id_for_return = task_id.clone();
+    tokio::spawn(async move {
+        let result = engine_arc
+            .execute(workflow_id.clone(), &app_clone, state_for_task)
+            .await;
+        let s = state_for_complete.lock();
+        match result {
+            Ok(r) => s.tasks.complete(
+                &task_id,
+                Some(serde_json::to_value(&r).unwrap_or(serde_json::Value::Null)),
+            ),
+            Err(e) => s.tasks.fail(&task_id, format!("{e:#}")),
+        }
+    });
+    Ok(task_id_for_return)
+}
+
+/// List all known workflow runs.
+#[tauri::command]
+pub fn workflow_runs(
+    state: State<'_, SharedState>,
+) -> Result<Vec<crate::workflow::WorkflowRunResult>> {
+    let s = state.lock();
+    Ok(s.workflow.runs())
+}
+
+// ===========================================================================
+// v1.6.0 — Knowledge Graph
+// ===========================================================================
+
+/// DTO for `graph_add_triple`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphTripleInput {
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default = "default_confidence")]
+    pub confidence: f64,
+}
+
+fn default_confidence() -> f64 {
+    0.7
+}
+
+/// Add or update a graph triple.
+#[tauri::command]
+pub fn graph_add_triple(state: State<'_, SharedState>, triple: GraphTripleInput) -> Result<i64> {
+    let s = state.lock();
+    s.memory.graph.upsert(
+        &triple.subject,
+        &triple.predicate,
+        &triple.object,
+        triple.source.as_deref(),
+        triple.confidence,
+    )
+}
+
+/// Query graph triples matching a partial pattern. Any of `subject`,
+/// `predicate`, `object` may be `None` (wildcard).
+#[tauri::command]
+pub fn graph_query(
+    state: State<'_, SharedState>,
+    subject: Option<String>,
+    predicate: Option<String>,
+    object: Option<String>,
+) -> Result<Vec<crate::memory::Triple>> {
+    let s = state.lock();
+    s.memory
+        .graph
+        .query(subject.as_deref(), predicate.as_deref(), object.as_deref())
+}
+
+/// Get the immediate neighborhood of a subject within `depth` hops.
+#[tauri::command]
+pub fn graph_neighbors(
+    state: State<'_, SharedState>,
+    subject: String,
+    depth: usize,
+) -> Result<Vec<crate::memory::Triple>> {
+    let s = state.lock();
+    s.memory.graph.neighbors(&subject, depth)
+}
+
+/// Find the shortest path between two entities.
+#[tauri::command]
+pub fn graph_path(
+    state: State<'_, SharedState>,
+    start: String,
+    target: String,
+    max_depth: usize,
+) -> Result<Vec<crate::memory::Triple>> {
+    let s = state.lock();
+    s.memory.graph.path(&start, &target, max_depth)
+}
+
+/// Distinct subjects known to the graph.
+#[tauri::command]
+pub fn graph_subjects(state: State<'_, SharedState>, limit: Option<usize>) -> Result<Vec<String>> {
+    let s = state.lock();
+    s.memory.graph.subjects(limit.unwrap_or(200))
+}
+
+/// Distinct predicate types in use.
+#[tauri::command]
+pub fn graph_predicates(state: State<'_, SharedState>) -> Result<Vec<String>> {
+    let s = state.lock();
+    s.memory.graph.predicates()
+}
+
+/// Total triple count.
+#[tauri::command]
+pub fn graph_count(state: State<'_, SharedState>) -> Result<i64> {
+    let s = state.lock();
+    s.memory.graph.count()
+}
+
+/// Clear the entire graph.
+#[tauri::command]
+pub fn graph_clear(state: State<'_, SharedState>) -> Result<()> {
+    let s = state.lock();
+    s.memory.graph.clear()
+}
+
+// ===========================================================================
+// v1.6.0 — Proactive Intelligence
+// ===========================================================================
+
+/// Return active (non-dismissed) insights.
+#[tauri::command]
+pub fn proactive_insights(
+    state: State<'_, SharedState>,
+) -> Result<Vec<crate::intelligence::Insight>> {
+    let s = state.lock();
+    Ok(s.proactive.active_insights())
+}
+
+/// Return the most recent N insights regardless of dismissed state.
+#[tauri::command]
+pub fn proactive_recent(
+    state: State<'_, SharedState>,
+    limit: usize,
+) -> Result<Vec<crate::intelligence::Insight>> {
+    let s = state.lock();
+    Ok(s.proactive.recent(limit))
+}
+
+/// Mark an insight as dismissed.
+#[tauri::command]
+pub fn proactive_dismiss(state: State<'_, SharedState>, insight_id: String) -> Result<bool> {
+    let s = state.lock();
+    Ok(s.proactive.dismiss(&insight_id))
+}
+
+/// Enable proactive intelligence.
+#[tauri::command]
+pub fn proactive_enable(state: State<'_, SharedState>) -> Result<()> {
+    let s = state.lock();
+    s.proactive.enable();
+    // Persist the toggle so it survives a restart.
+    {
+        let mut cfg = s.config.write();
+        cfg.proactive_intelligence = true;
+    }
+    let _ = s.config.persist();
+    Ok(())
+}
+
+/// Disable proactive intelligence.
+#[tauri::command]
+pub fn proactive_disable(state: State<'_, SharedState>) -> Result<()> {
+    let s = state.lock();
+    s.proactive.disable();
+    {
+        let mut cfg = s.config.write();
+        cfg.proactive_intelligence = false;
+    }
+    let _ = s.config.persist();
+    Ok(())
+}
+
+/// Is proactive intelligence currently enabled?
+#[tauri::command]
+pub fn proactive_enabled(state: State<'_, SharedState>) -> Result<bool> {
+    let s = state.lock();
+    Ok(s.proactive.is_enabled())
+}
+
+// ===========================================================================
+// v1.6.0 — Background Task Queue
+// ===========================================================================
+
+/// List all known tasks (newest first).
+#[tauri::command]
+pub fn tasks_list(state: State<'_, SharedState>) -> Result<Vec<crate::tasks::Task>> {
+    let s = state.lock();
+    Ok(s.tasks.list())
+}
+
+/// List only non-terminal tasks (pending / running).
+#[tauri::command]
+pub fn tasks_active(state: State<'_, SharedState>) -> Result<Vec<crate::tasks::Task>> {
+    let s = state.lock();
+    Ok(s.tasks.active())
+}
+
+/// Get a single task by id.
+#[tauri::command]
+pub fn tasks_get(
+    state: State<'_, SharedState>,
+    task_id: String,
+) -> Result<Option<crate::tasks::Task>> {
+    let s = state.lock();
+    Ok(s.tasks.get(&task_id))
+}
+
+/// Cancel a running task. Returns `false` if the task is already terminal.
+#[tauri::command]
+pub fn tasks_cancel(state: State<'_, SharedState>, task_id: String) -> Result<bool> {
+    let s = state.lock();
+    Ok(s.tasks.cancel(&task_id))
 }

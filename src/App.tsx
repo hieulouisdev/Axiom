@@ -8,6 +8,7 @@ import { Settings } from "./components/Settings";
 import { Modes } from "./components/Modes";
 import { Web } from "./components/Web";
 import { Guide } from "./components/Guide";
+import { Studio } from "./components/Studio";
 import { useStore } from "./store";
 import { i18nGetLocale, i18nSetLocale, settingsGet } from "./lib/tauri";
 import { setLocale as setI18nLocale, type Locale, SUPPORTED_LOCALES } from "./i18n";
@@ -44,6 +45,7 @@ export default function App() {
       <main className="flex-1 flex flex-col overflow-hidden bg-aegis-50 dark:bg-aegis-night-500">
         {view === "chat" && <Chat />}
         {view === "web" && <Web />}
+        {view === "studio" && <Studio />}
         {view === "providers" && <Providers />}
         {view === "memory" && <Memory />}
         {view === "security" && <Security />}

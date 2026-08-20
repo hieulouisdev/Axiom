@@ -33,6 +33,11 @@ pub async fn start(state: Arc<Mutex<AppState>>, app: AppHandle) {
                 .memory
                 .activity
                 .record("heartbeat", "continuous-mode tick", None);
+
+            // v1.6: tickle the proactive intelligence engine so it can
+            // surface new insights to the UI. The engine itself decides
+            // whether to do anything based on its internal counter.
+            s.proactive.tick(&s.memory, &app);
         }
     }
 }

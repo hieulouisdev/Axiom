@@ -57,6 +57,42 @@ pub struct AppConfig {
     /// ~/repos, ~/.config) so the AI can write code into the user's project
     /// folders without confirmation prompts on every file.
     pub bypass_mode: bool,
+
+    /// v1.6: ID of the active skill. v1.5 stored this in a sidecar
+    /// `data_dir/active_skill` text file; v1.6 promotes it into the main
+    /// config so it's part of the persisted, versioned schema. On boot,
+    /// if `active_skill` is `None` and the sidecar file still exists, the
+    /// sidecar is migrated into the config and removed.
+    #[serde(default)]
+    pub active_skill: Option<String>,
+
+    /// v1.6: Whether the proactive intelligence engine is enabled. The
+    /// engine itself defaults to off; the user must opt in (the Settings
+    /// UI exposes a toggle). When off, the heartbeat still runs but the
+    /// pattern detectors are no-ops.
+    #[serde(default)]
+    pub proactive_intelligence: bool,
+
+    /// v1.6: Maximum number of plan steps the orchestrator may execute in
+    /// parallel. Clamped to `[1, 16]` at boot. Defaults to 3 — enough to
+    /// overlap a research + code + summarization step on most machines
+    /// without saturating the AI provider's rate limit.
+    #[serde(default = "default_orchestrator_max_parallel")]
+    pub orchestrator_max_parallel: u32,
+
+    /// v1.6: Whether the workflow engine is enabled. When off, all
+    /// `workflow_*` commands return `AegisError::Config("workflow engine
+    /// disabled")`. Useful for users who want a leaner binary.
+    #[serde(default = "default_workflow_enabled")]
+    pub workflow_engine: bool,
+}
+
+fn default_orchestrator_max_parallel() -> u32 {
+    3
+}
+
+fn default_workflow_enabled() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -219,7 +255,7 @@ impl Default for MemoryConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             mode: OperatingMode::OnDemand,
             providers: ProviderRegistry::default(),
@@ -228,6 +264,10 @@ impl Default for AppConfig {
             memory: MemoryConfig::default(),
             allow_autonomous: false,
             bypass_mode: false,
+            active_skill: None,
+            proactive_intelligence: false,
+            orchestrator_max_parallel: default_orchestrator_max_parallel(),
+            workflow_engine: true,
         }
     }
 }
@@ -254,8 +294,39 @@ impl AppConfig {
         }
         let text = std::fs::read_to_string(&path)
             .with_context(|| format!("reading config at {}", path.display()))?;
-        let cfg: AppConfig = toml::from_str(&text).context("parsing config.toml")?;
+        let mut cfg: AppConfig = toml::from_str(&text).context("parsing config.toml")?;
+        // v1.6 schema migration.
+        if cfg.schema_version < 2 {
+            cfg = Self::migrate_v1_to_v2(cfg);
+            cfg.save()?;
+        }
         Ok(cfg)
+    }
+
+    /// v1.6 schema migration: pull `active_skill` out of the legacy sidecar
+    /// text file `data_dir/active_skill` into the new config field. The
+    /// sidecar file is removed once migrated.
+    fn migrate_v1_to_v2(mut cfg: Self) -> Self {
+        cfg.schema_version = 2;
+        // Pull active_skill from the legacy sidecar file if present.
+        if cfg.active_skill.is_none() {
+            let sidecar = Self::data_dir().join("active_skill");
+            if let Ok(text) = std::fs::read_to_string(&sidecar) {
+                let id = text.trim().to_string();
+                if !id.is_empty() {
+                    cfg.active_skill = Some(id);
+                }
+                // Remove the sidecar file — single source of truth is the config.
+                let _ = std::fs::remove_file(&sidecar);
+            }
+        }
+        // Backfill new fields with defaults if they weren't present in the
+        // old TOML (serde's `#[serde(default)]` already does this for
+        // primitive fields, but explicit is clearer).
+        if cfg.orchestrator_max_parallel == 0 {
+            cfg.orchestrator_max_parallel = default_orchestrator_max_parallel();
+        }
+        cfg
     }
 
     pub fn save(&self) -> Result<()> {

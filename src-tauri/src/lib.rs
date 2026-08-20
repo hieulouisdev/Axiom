@@ -19,6 +19,11 @@
 //! - Voice I/O: STT (cloud Whisper), TTS (OS-native + ElevenLabs), PTT (v0.5)
 //! - CalDAV calendar integration + intent dispatch (v0.5)
 //! - Bilingual UI (English default, Vietnamese)
+//! - **v1.6: Multi-agent DAG orchestrator (planner → executor → critic)**
+//! - **v1.6: Declarative workflow engine with conditional branches + parallel steps**
+//! - **v1.6: Knowledge graph with entity-relation triples + multi-hop queries**
+//! - **v1.6: Proactive intelligence layer (pattern detection + insight surfacing)**
+//! - **v1.6: Background task queue with cancellation + progress streaming**
 
 // Provider factories intentionally return `Arc<dyn Provider>` rather than
 // `Self`, because each provider is registered by id into a heterogeneous
@@ -41,11 +46,14 @@ pub mod computer;
 pub mod config;
 pub mod error;
 pub mod i18n;
+pub mod intelligence;
 pub mod memory;
 pub mod modes;
 pub mod security;
 pub mod state;
+pub mod tasks;
 pub mod voice;
+pub mod workflow;
 
 use std::sync::Arc;
 
@@ -248,6 +256,39 @@ pub fn run() {
             commands::telemetry_status,
             commands::telemetry_opt_in,
             commands::telemetry_opt_out,
+            // ===== v1.6 — Multi-Agent Orchestrator =====
+            commands::orchestrator_run_plan,
+            commands::orchestrator_get_plan,
+            commands::orchestrator_list_plans,
+            commands::orchestrator_cancel,
+            // ===== v1.6 — Workflow Engine =====
+            commands::workflow_upsert,
+            commands::workflow_delete,
+            commands::workflow_get,
+            commands::workflow_list,
+            commands::workflow_run,
+            commands::workflow_runs,
+            // ===== v1.6 — Knowledge Graph =====
+            commands::graph_add_triple,
+            commands::graph_query,
+            commands::graph_neighbors,
+            commands::graph_path,
+            commands::graph_subjects,
+            commands::graph_predicates,
+            commands::graph_count,
+            commands::graph_clear,
+            // ===== v1.6 — Proactive Intelligence =====
+            commands::proactive_insights,
+            commands::proactive_recent,
+            commands::proactive_dismiss,
+            commands::proactive_enable,
+            commands::proactive_disable,
+            commands::proactive_enabled,
+            // ===== v1.6 — Background Task Queue =====
+            commands::tasks_list,
+            commands::tasks_active,
+            commands::tasks_get,
+            commands::tasks_cancel,
             // ===== System =====
             commands::app_version,
             commands::app_quit,

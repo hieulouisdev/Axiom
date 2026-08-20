@@ -8,7 +8,8 @@ export type ViewId =
   | "modes"
   | "settings"
   | "web"
-  | "guide";
+  | "guide"
+  | "studio";
 
 export interface ProviderDto {
   id: string;

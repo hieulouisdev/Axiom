@@ -7,12 +7,18 @@ use parking_lot::Mutex;
 use tauri::AppHandle;
 
 use crate::{
-    ai::{provider::ProviderRegistry as AiProviderRegistry, router::AiRouter},
+    ai::{
+        orchestrator::Orchestrator, provider::ProviderRegistry as AiProviderRegistry,
+        router::AiRouter,
+    },
     calendar::{CalendarClient, CalendarConfig},
     config::{AppConfig, ConfigStore},
+    intelligence::ProactiveEngine,
     memory::store::MemoryStore,
     security::{quarantine::QuarantineStore, sandbox::SandboxPolicy, telemetry::TelemetryConfig},
+    tasks::TaskQueue,
     voice::HotkeyManager,
+    workflow::WorkflowEngine,
 };
 
 /// Top-level container holding live handles to every backend subsystem.
@@ -60,6 +66,20 @@ pub struct AppState {
 
     /// v0.7: Telemetry config — opt-in only, never on by default.
     pub telemetry: Mutex<TelemetryConfig>,
+
+    /// v1.6: Multi-agent DAG orchestrator.
+    pub orchestrator: Arc<Orchestrator>,
+
+    /// v1.6: Declarative workflow engine.
+    pub workflow: Arc<WorkflowEngine>,
+
+    /// v1.6: Background task queue — durable substrate behind long-running
+    /// plans, workflow runs, and batch operations.
+    pub tasks: Arc<TaskQueue>,
+
+    /// v1.6: Proactive intelligence layer — pattern detection + insight
+    /// surfacing. Tickled from the continuous-mode heartbeat.
+    pub proactive: Arc<ProactiveEngine>,
 }
 
 impl AppState {
@@ -104,6 +124,10 @@ impl AppState {
             calendar: Mutex::new(calendar),
             sandbox: Mutex::new(SandboxPolicy::default()),
             telemetry: Mutex::new(TelemetryConfig::new()),
+            orchestrator: Arc::new(Orchestrator::new()),
+            workflow: Arc::new(WorkflowEngine::new()),
+            tasks: Arc::new(TaskQueue::new()),
+            proactive: Arc::new(ProactiveEngine::new()),
         }))
     }
 
@@ -160,11 +184,25 @@ impl AppState {
             }
         }
 
+        // v1.6: Wire the orchestrator's parallelism ceiling from config.
+        {
+            let s = state.lock();
+            s.orchestrator
+                .set_max_parallel(cfg.orchestrator_max_parallel as usize);
+            if cfg.proactive_intelligence {
+                s.proactive.enable();
+            } else {
+                s.proactive.disable();
+            }
+        }
+
         tracing::info!(
-            "boot complete | language={} | mode={:?} | auto_defense={}",
+            "boot complete | language={} | mode={:?} | auto_defense={} | proactive={} | max_parallel={}",
             cfg.language,
             cfg.mode,
-            cfg.security.auto_defense
+            cfg.security.auto_defense,
+            cfg.proactive_intelligence,
+            cfg.orchestrator_max_parallel,
         );
 
         // Spawn the security monitor if enabled.

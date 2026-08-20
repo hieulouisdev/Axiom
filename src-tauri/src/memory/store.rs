@@ -12,6 +12,7 @@ use crate::error::Result;
 use super::activity::ActivityLog;
 use super::conversation::ConversationStore;
 use super::embeddings::EmbeddingStore;
+use super::graph::KnowledgeGraph;
 use super::knowledge::KnowledgeBase;
 
 /// Type alias for the shared connection used by all sub-stores.
@@ -24,6 +25,8 @@ pub struct MemoryStore {
     pub knowledge: KnowledgeBase,
     /// v0.5: vector embeddings for RAG.
     pub embeddings: EmbeddingStore,
+    /// v1.6: typed entity-relation graph for multi-hop queries.
+    pub graph: KnowledgeGraph,
 }
 
 impl MemoryStore {
@@ -48,6 +51,7 @@ impl MemoryStore {
             activity: ActivityLog::new(conn.clone()),
             knowledge: KnowledgeBase::new(conn.clone()),
             embeddings: EmbeddingStore::new(conn.clone()),
+            graph: KnowledgeGraph::new(conn.clone()),
             conn,
         }
     }
@@ -120,6 +124,10 @@ impl MemoryStore {
 
         // v0.5: knowledge_embeddings table for vector RAG.
         crate::memory::embeddings::migrate(&conn)?;
+
+        // v1.6: knowledge_graph table for typed entity relations.
+        drop(conn); // release the borrow before KnowledgeGraph borrows it
+        self.graph.migrate()?;
 
         Ok(())
     }

@@ -12,12 +12,18 @@
 //! locations, and other durable facts from chat history. This closes the
 //! RAG loop: every chat contributes to the user's long-term memory without
 //! requiring explicit `memory_remember` calls.
+//!
+//! v1.6 adds [`graph`] — a typed entity-relation store complementing the
+//! key-value `knowledge` table. Triples `(subject, predicate, object)` let
+//! the agent answer multi-hop questions ("how do X and Y relate?") that
+//! flat-key lookups can't.
 
 pub mod activity;
 pub mod conversation;
 pub mod embeddings;
 pub mod encryption;
 pub mod entities;
+pub mod graph;
 pub mod knowledge;
 pub mod rag;
 pub mod store;
@@ -27,5 +33,6 @@ pub use conversation::{Conversation, ConversationStore, Message};
 pub use embeddings::EmbeddingStore;
 pub use encryption::{EncryptionStatus, status as encryption_status};
 pub use entities::{ExtractedEntity, extract_and_store, extract_from_messages};
+pub use graph::{KnowledgeGraph, Triple};
 pub use knowledge::{KnowledgeBase, KnowledgeEntry};
 pub use store::MemoryStore;

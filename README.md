@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.97.1-orange.svg)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-blue.svg)](https://tauri.app)
-[![Release](https://img.shields.io/badge/Release-v1.1.0-green.svg)](https://github.com/hieulouisdev/Axiom/releases)
+[![Release](https://img.shields.io/badge/Release-v1.6.0-blue.svg)](https://github.com/hieulouisdev/Axiom/releases)
 [![GitHub stars](https://img.shields.io/github/stars/hieulouisdev/Axiom?style=social)](https://github.com/hieulouisdev/Axiom)
 [![GitHub forks](https://img.shields.io/github/forks/hieulouisdev/Axiom?style=social)](https://github.com/hieulouisdev/Axiom)
 </div>

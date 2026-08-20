@@ -1,8 +1,57 @@
 # Aegis AI — Development Roadmap
 
-Current release: **v1.1.0** (Toolchain & Dependency Modernization). The project follows a 4-phase plan.
+Current release: **v1.6.0** (Singularity Upgrade — multi-agent orchestrator, workflow engine, knowledge graph, proactive intelligence, background task queue). The project follows a 4-phase plan.
 
 ---
+
+## Phase 5 — Singularity (v1.6.0) ✅
+
+The biggest single feature drop in Aegis AI history. Five new backend
+subsystems ship together, each one sufficient on its own to anchor a major
+release.
+
+**Status:** Released as `Aegis AI v1.6.0`.
+
+| Subsystem | Status | Notes |
+|---|---|---|
+| Multi-agent orchestrator | ✅ | `ai/orchestrator.rs` — planner → executor → critic DAG with topological parallel execution up to `orchestrator_max_parallel` |
+| Declarative workflow engine | ✅ | `workflow/{mod,dsl,executor}.rs` — tagged-union DSL, conditional branches, concurrent `join_all` batches, sandbox-respecting shell + file I/O |
+| Knowledge graph | ✅ | `memory/graph.rs` — `(subject, predicate, object)` triples in SQLite, SPARQL-style patterns, multi-hop BFS, shortest path |
+| Proactive intelligence | ✅ | `intelligence/{mod,proactive}.rs` — pattern detection engine (4 rotating detectors), insight lifecycle, privacy-by-construction |
+| Background task queue | ✅ | `tasks/mod.rs` — stable UUIDs, cooperative cancellation via `CancelFlag`, progress streaming via `task://progress` events, FIFO eviction |
+| Schema v2 migration | ✅ | `active_skill`, `proactive_intelligence`, `orchestrator_max_parallel`, `workflow_engine` fields; legacy `data_dir/active_skill` sidecar migrated into the config |
+| Frontend Studio view | ✅ | `src/components/Studio.tsx` — tabbed UI for orchestrator / workflows / graph / tasks, with proactive-intelligence banner |
+| 25+ unwired backend commands wired to frontend | ✅ | `agent_list_tools`, `audit_recent/count/wipe`, all `safety_*` / `bypass_mode_*` toggles, `ai_list_models` (10k+ model catalog), `skills_*`, `voice_*`, `memory_summarize` |
+
+### Phase 5 — Next: v1.7.0 (deferred from this release)
+
+- [ ] **Neural embeddings** — replace character-trigram hashing with
+  `all-MiniLM-L6-v2` via the `ort` crate (deferred since v0.5; still on
+  the roadmap because it's the single biggest RAG-quality win available).
+- [ ] **Workflow scheduler** — materialize the `Cron` and `Event`
+  trigger kinds declared in the v1.6 DSL. Currently only `Manual` runs.
+- [ ] **Task persistence** — v1.6 stores task records in-memory only;
+  v1.7 will persist them to SQLite so the historical view survives a
+  restart.
+- [ ] **Workflow retry policy** — the DSL declares a `retries` field per
+  step but the executor doesn't yet honor it. v1.7 will retry with
+  exponential backoff.
+- [ ] **Orchestrator parallel step ordering** — v1.6 executes independent
+  branches in concurrent `tokio::spawn` tasks; v1.7 will add a fairness
+  scheduler so a long-running AI call doesn't starve shorter siblings.
+- [ ] **macOS bundle target** — `bundle.targets` is currently
+  `["msi", "nsis", "deb", "appimage"]`. Add `.dmg` + `.app` once a macOS
+  CI runner is available.
+- [ ] **SQLCipher encryption** — `memory/encryption.rs` is still a stub
+  returning `NotSupported`. Real at-rest encryption remains high priority.
+- [ ] **Signed confirmation tokens** — `computer/safety.rs::gen_token()`
+  still uses SHA-256+UUID; migrate to HMAC with 60s expiry.
+- [ ] **Updater signing** — `tauri.conf.json::plugins.updater.pubkey` is
+  still empty. Generate a keypair + wire the public key.
+
+---
+
+
 
 ## Phase 1 — Foundation (v0.1) ✅
 

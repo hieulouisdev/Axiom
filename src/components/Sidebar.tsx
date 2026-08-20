@@ -12,6 +12,7 @@ import {
   PanelLeft,
   Globe,
   BookOpen,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { useStore, type ViewId } from "../store";
@@ -28,6 +29,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: "chat", icon: MessageSquare, key: "nav.chat" },
   { id: "web", icon: Globe, key: "nav.web", badge: "new" },
+  { id: "studio", icon: Workflow, key: "nav.studio", badge: "v1.6" },
   { id: "providers", icon: Cpu, key: "nav.providers" },
   { id: "memory", icon: Database, key: "nav.memory" },
   { id: "security", icon: Lock, key: "nav.security" },

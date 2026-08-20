@@ -9,7 +9,8 @@ export type ViewId =
   | "modes"
   | "settings"
   | "web"
-  | "guide";
+  | "guide"
+  | "studio";
 
 export type Theme = "light" | "dark";
 
