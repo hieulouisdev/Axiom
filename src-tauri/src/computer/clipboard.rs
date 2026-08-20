@@ -16,12 +16,12 @@ pub struct ClipboardContent {
 }
 
 /// State for clipboard watching.
-static WATCHING: once_cell::sync::Lazy<Mutex<bool>> =
-    once_cell::sync::Lazy::new(|| Mutex::new(false));
+static WATCHING: LazyLock<Mutex<bool>> =
+    LazyLock::new(|| Mutex::new(false));
 
 /// Last clipboard content (for change detection).
-static LAST_CONTENT: once_cell::sync::Lazy<Mutex<String>> =
-    once_cell::sync::Lazy::new(|| Mutex::new(String::new()));
+static LAST_CONTENT: LazyLock<Mutex<String>> =
+    LazyLock::new(|| Mutex::new(String::new()));
 
 /// Read the current clipboard text.
 pub fn clipboard_read() -> Result<ClipboardContent> {

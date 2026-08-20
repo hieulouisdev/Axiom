@@ -2,6 +2,32 @@
 
 All notable changes to Aegis AI. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] — 2026-08-20 — Rust 1.97.1 Migration & Dependency Cleanup
+
+A maintenance release that modernizes the runtime to Rust 1.97.1,
+cleans up unused dependencies, and improves code consistency across
+the backend.
+
+### Changed — Runtime & Dependencies
+
+- **Pinned Rust toolchain to 1.97.1** — `rust-toolchain.toml` now
+  explicitly requires Rust 1.97.1, and both GitHub Actions workflows
+  install the same pinned version via `dtolnay/rust-toolchain`.
+- **Migrated `once_cell::sync::Lazy` to `std::sync::LazyLock`** —
+  Rust 1.80+ stabilizes `LazyLock` in the standard library, making
+  the `once_cell` crate unnecessary. Updated all 7 files:
+  `i18n/mod.rs`, `computer/clipboard.rs`, `modes/watcher.rs`,
+  `ai/fast_path.rs`, `security/defender.rs`, `security/integrity.rs`,
+  `security/monitor.rs`.
+- **Removed unused `once_cell` dependency** from `src-tauri/Cargo.toml`.
+- **Removed unused `ring` dependency** from workspace `Cargo.toml`
+  (was declared but never imported anywhere in the codebase).
+
+### Removed
+
+- **Deleted dead `ai/providers/_macro.rs`** — this file existed on disk
+  but was never declared in `mod.rs`, so it was never compiled.
+
 ## [1.2.0] — 2026-08-20 — CI Fix & Code Cleanup
 
 A targeted patch release that fixes the GitHub Actions CI pipeline and

@@ -57,7 +57,7 @@ pub fn build_tuned_client() -> Client {
 /// Useful for one-off provider implementations that don't bother building
 /// their own client — every call to this function returns the same instance.
 pub fn shared_client() -> Client {
-    use once_cell::sync::Lazy;
+    use std::sync::LazyLock;
     static SHARED: Lazy<Client> = Lazy::new(build_tuned_client);
     SHARED.clone()
 }

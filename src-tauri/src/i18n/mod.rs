@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 

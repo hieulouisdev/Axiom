@@ -43,8 +43,8 @@ impl Default for WatchConfig {
 }
 
 /// Recent file system events.
-static RECENT_EVENTS: once_cell::sync::Lazy<Mutex<Vec<WatchEvent>>> =
-    once_cell::sync::Lazy::new(|| Mutex::new(Vec::new()));
+static RECENT_EVENTS: LazyLock<Mutex<Vec<WatchEvent>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
 
 /// Returns recent file system watch events.
 pub fn recent_events() -> Vec<WatchEvent> {

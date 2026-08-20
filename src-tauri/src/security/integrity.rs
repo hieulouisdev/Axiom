@@ -20,8 +20,8 @@ pub struct IntegrityEvent {
 }
 
 /// Baseline hashes stored for comparison.
-static BASELINES: once_cell::sync::Lazy<parking_lot::Mutex<HashMap<String, String>>> =
-    once_cell::sync::Lazy::new(|| parking_lot::Mutex::new(HashMap::new()));
+static BASELINES: LazyLock<parking_lot::Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| parking_lot::Mutex::new(HashMap::new()));
 
 /// Returns the list of critical files to monitor based on platform.
 pub fn critical_files() -> Vec<String> {
