@@ -38,6 +38,9 @@ pub enum AegisError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    #[error("Other error: {0}")]
+    Other(String),
 }
 
 impl From<anyhow::Error> for AegisError {
@@ -88,6 +91,7 @@ impl serde::Serialize for AegisError {
             AegisError::Io(_) => "io",
             AegisError::Network(_) => "network",
             AegisError::Internal(_) => "internal",
+            AegisError::Other(_) => "other",
         };
 
         let mut st = serializer.serialize_struct("AegisError", 3)?;
@@ -101,3 +105,6 @@ impl serde::Serialize for AegisError {
 }
 
 pub type Result<T> = std::result::Result<T, AegisError>;
+
+/// Short alias used by submodules for ergonomic error construction.
+pub type Error = AegisError;

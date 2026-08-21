@@ -19,20 +19,28 @@
 //! flat-key lookups can't.
 
 pub mod activity;
+pub mod codegraph;
 pub mod conversation;
 pub mod embeddings;
 pub mod encryption;
 pub mod entities;
 pub mod graph;
+pub mod hierarchy;
 pub mod knowledge;
 pub mod rag;
+pub mod skill_lib;
 pub mod store;
+pub mod wiki;
 
 pub use activity::{ActivityLog, ActivityRecord};
+pub use codegraph::{CodeGraph, Symbol, SymbolKind, CallEdge, Repo};
 pub use conversation::{Conversation, ConversationStore, Message};
 pub use embeddings::EmbeddingStore;
 pub use encryption::{EncryptionStatus, status as encryption_status};
 pub use entities::{ExtractedEntity, extract_and_store, extract_from_messages};
 pub use graph::{KnowledgeGraph, Triple};
+pub use hierarchy::{HierarchicalMemory, MemoryAtom, AtomKind, Scenario, Persona, PersonaTrait, deterministic_extract};
 pub use knowledge::{KnowledgeBase, KnowledgeEntry};
+pub use skill_lib::{SkillLibrary, Skill, SkillVersion, SkillStatus, Visibility, SkillTrigger, SkillStep};
 pub use store::MemoryStore;
+pub use wiki::{Wiki, WikiPage, WikiLink};

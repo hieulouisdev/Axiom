@@ -14,6 +14,10 @@ use super::conversation::ConversationStore;
 use super::embeddings::EmbeddingStore;
 use super::graph::KnowledgeGraph;
 use super::knowledge::KnowledgeBase;
+use super::hierarchy::HierarchicalMemory;
+use super::skill_lib::SkillLibrary;
+use super::wiki::Wiki;
+use super::codegraph::CodeGraph;
 
 /// Type alias for the shared connection used by all sub-stores.
 pub type SharedConn = Arc<Mutex<Connection>>;
@@ -27,6 +31,14 @@ pub struct MemoryStore {
     pub embeddings: EmbeddingStore,
     /// v1.6: typed entity-relation graph for multi-hop queries.
     pub graph: KnowledgeGraph,
+    /// v1.7: L0→L3 hierarchical memory (persona, scenarios, atoms).
+    pub hierarchy: HierarchicalMemory,
+    /// v1.7: versioned skill library (draft → review → published → deprecated).
+    pub skills: SkillLibrary,
+    /// v1.7: structured wiki pages with link graph.
+    pub wiki: Wiki,
+    /// v1.7: code-symbol graph for impact analysis.
+    pub code_graph: CodeGraph,
 }
 
 impl MemoryStore {
@@ -52,6 +64,10 @@ impl MemoryStore {
             knowledge: KnowledgeBase::new(conn.clone()),
             embeddings: EmbeddingStore::new(conn.clone()),
             graph: KnowledgeGraph::new(conn.clone()),
+            hierarchy: HierarchicalMemory::new(conn.clone()),
+            skills: SkillLibrary::new(conn.clone()),
+            wiki: Wiki::new(conn.clone()),
+            code_graph: CodeGraph::new(conn.clone()),
             conn,
         }
     }
@@ -128,6 +144,12 @@ impl MemoryStore {
         // v1.6: knowledge_graph table for typed entity relations.
         drop(conn); // release the borrow before KnowledgeGraph borrows it
         self.graph.migrate()?;
+
+        // v1.7: hierarchical memory + skill library + wiki + code graph.
+        self.hierarchy.migrate()?;
+        self.skills.migrate()?;
+        self.wiki.migrate()?;
+        self.code_graph.migrate()?;
 
         Ok(())
     }

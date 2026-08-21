@@ -2,6 +2,173 @@
 
 All notable changes to Aegis AI. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.7.0] — 2026-08-21 — Singularity II
+
+The second-largest feature drop in Aegis AI history. Five new subsystems
+ship together, inspired by [TencentDB-Agent-Memory](https://github.com/TencentCloud/TencentDB-Agent-Memory)
+and [worldmonitor](https://github.com/koala73/worldmonitor). On top of
+the v1.6 Singularity baseline, v1.7 turns Aegis AI from a desktop app
+into a **cross-platform AI workspace** with a beautiful CLI, world-class
+memory, real-time world intelligence, and an MCP server.
+
+### Added — Hierarchical Memory (`memory/hierarchy.rs`, ~280 LOC)
+
+Inspired by TencentDB-Agent-Memory's L0→L3 layering:
+
+- **L0 Conversations** — verbatim chat messages (already in v0.2).
+- **L1 Atoms** — single distilled facts / preferences / decisions /
+  instructions / goals / context, extracted automatically from chat
+  via a deterministic regex/keyword pass (`deterministic_extract`).
+- **L2 Scenarios** — themed clusters of atoms ("project X", "auth
+  refactor") with tags and atom counts.
+- **L3 Persona** — long-term user traits (`language`, `tz`,
+  `prefers terse answers`, …), one row per user.
+- **Prompt rendering** — `render_prompt_fragment()` produces a system-
+  prompt block combining persona + scenarios + recent atoms.
+- 5 unit tests covering atom roundtrip, scenario assignment, persona
+  upsert, deterministic extraction, and prompt rendering.
+
+### Added — Versioned Skill Library (`memory/skill_lib.rs`, ~320 LOC)
+
+- **Lifecycle**: draft → review → published → deprecated → archived.
+- **Versioned snapshots**: every `save_version` call creates a new
+  numbered version with `system_prompt`, `trigger` (keywords + intents),
+  `steps`, `validation_rules`, and `resources`. Only `published`
+  versions are loaded into the agent context.
+- **Trigger matching**: `match_triggers(message)` returns the slugs of
+  all published skills whose trigger keywords appear in the message,
+  sorted by keyword length (specificity).
+- **Visibility**: private / team / public.
+- 3 unit tests covering create/publish lifecycle, version promotion,
+  and trigger matching.
+
+### Added — Wiki Knowledge Base (`memory/wiki.rs`, ~200 LOC)
+
+- **Pages** with `slug`, `title`, `body` (Markdown), `tags`, `source`.
+- **Bidirectional link graph** (`wiki_links` table) — `links_from` /
+  `links_to` (backlinks).
+- **Full-text search** across title + body + tags.
+- 2 unit tests covering upsert/links and search.
+
+### Added — CodeGraph (`memory/codegraph.rs`, ~360 LOC)
+
+Inspired by TencentDB-Agent-Memory's CodeGraph:
+
+- **Symbol indexer** for Rust / TypeScript / Python / Go / JavaScript.
+  Regex-based — no tree-sitter deps. Extracts functions, methods,
+  structs, enums, traits, interfaces, classes, modules, constants, types.
+- **Call edges** — within-body identifier-followed-by-`(` heuristic
+  creates `caller → callee` edges in the same SQLite DB.
+- **Impact analysis** — `callers_of(symbol_id)` and `callees_of(symbol_id)`
+  for "who calls this?" / "what does this call?" queries.
+- **Multi-repo** — register multiple repos with `register_repo(path,
+  language)`, each gets its own `code_repos` row.
+- 1 integration test covering Rust indexing with callers.
+
+### Added — World Intelligence (`world/`, ~600 LOC)
+
+Inspired by [worldmonitor](https://github.com/koala73/worldmonitor):
+
+- **Feeds registry** (`feeds.rs`) — 20+ curated RSS/Atom feeds:
+  Reuters, BBC, Al Jazeera, NYT, DW, VnExpress (Vietnamese), GDELT,
+  ACLED, ISW, Hacker News, TechCrunch, Ars Technica, The Verge, CNBC,
+  FT, Bloomberg, Krebs on Security, Schneier on Security, The Hacker
+  News, Nature, NASA FIRMS (fires), USGS (earthquakes).
+- **Async fetcher** with concurrent pull (up to 16 in flight) and a
+  unified RSS 2.0 + Atom 1.0 parser (no `quick-xml` dep — hand-rolled
+  for zero-dep portability).
+- **News aggregator** (`news.rs`) — dedup by GUID/link, salience
+  scoring (recency × keyword presence), category classification,
+  prompt rendering.
+- **Finance** (`finance.rs`) — CoinGecko (crypto, no API key), ECB
+  daily reference rates (FX), Stooq (stocks, CSV). All free, no keys.
+- **Country Instability Index** (`geopolitics.rs`) — weighted 0..100
+  score from news volume + negative ratio + disaster count + market
+  stress. 5 risk levels: stable / watch / elevated / high / critical.
+- **Daily brief composer** (`brief.rs`) — combines news + markets +
+  risks into a single text block for the agent system prompt.
+- 8 unit tests covering RSS/Atom parsing, salience decay, dedup,
+  ECB XML parsing, risk scoring, sentiment classification.
+
+### Added — MCP Server (`mcp/`, ~250 LOC)
+
+Inspired by worldmonitor's MCP integration:
+
+- **JSON-RPC 2.0 over stdio** — works with Claude Desktop, Cursor,
+  Codex, and any MCP-compatible client.
+- **Methods**: `initialize`, `ping`, `tools/list`, `tools/call`,
+  `shutdown`.
+- **9 tools** registered by default: `memory_search`,
+  `memory_remember`, `skills_match`, `world_news`, `world_finance`,
+  `world_risk`, `wiki_search`, `codegraph_search`, `graph_query`.
+- Handlers are no-op by default; the desktop app and CLI both replace
+  them with real implementations at startup.
+- 3 unit tests covering initialize, tools/list, and tools/call.
+
+### Added — Aegis CLI (`cli/`, ~2,500 LOC)
+
+A brand-new standalone binary — no Tauri, no webkit, no system deps.
+Cross-platform: Linux x64 / ARM64 / ARMv7 / musl, Windows x64, macOS
+Intel / Apple Silicon, and Android (via Termux).
+
+- **7 built-in AI providers**: OpenAI, Anthropic, Gemini, DeepSeek,
+  Z.AI (GLM-4.6, zero-key public preview), Ollama (local), OpenRouter.
+  Plus a generic OpenAI-compatible fallback for custom endpoints.
+- **Beautiful TUI** built with `ratatui` + `crossterm`. Five panels:
+  Chat / Memory / World / Skills / Settings. Tab to switch, Esc to quit.
+- **One-shot mode**: `aegis chat "explain async rust"` — single query,
+  print answer, exit. Use `--json` for machine-readable output.
+- **All v1.7 subsystems** accessible from CLI:
+  - `aegis memory atoms | scenarios | persona | add | set-trait | prompt`
+  - `aegis skills list | show | match | create | save-version | publish`
+  - `aegis wiki list | search | show | add | remove`
+  - `aegis world news | finance | snapshot | risk | brief`
+  - `aegis code register | repos | index | search | callers | callees`
+  - `aegis mcp` — run the MCP server
+- **Cross-platform builds** via GitHub Actions workflow
+  (`.github/workflows/cli-release.yml`) — automatically builds and
+  attaches binaries to the v* release for all 7 targets.
+- **Pure-Rust TLS** — uses `rustls` + `ring` (no `aws-lc-sys`), so
+  cross-compilation works without a C cross-compiler.
+
+### Changed — Workspace
+
+- Bumped version `1.6.0` → `1.7.0` in workspace + desktop + CLI.
+- Added `cli` as a workspace member.
+- Added `Other` variant to `AegisError` for ergonomic error construction
+  in the new modules.
+- Desktop app's `MemoryStore` now initializes the new `hierarchy`,
+  `skills`, `wiki`, and `code_graph` sub-stores and runs their
+  migrations.
+- Desktop app's `lib.rs` now exports `pub mod world;` and `pub mod mcp;`.
+
+### Changed — README
+
+- Completely rewritten with v1.7.0 features, download instructions for
+  every platform (including Android via Termux), MCP integration guide
+  for Claude Desktop and Cursor, and acknowledgements for the two
+  reference repos.
+
+### Changed — CI
+
+- Added `.github/workflows/cli-release.yml` — builds the CLI binary for
+  7 targets on tag push and attaches them to the release.
+
+### Acknowledgements
+
+The v1.7.0 design owes a debt to two open-source projects:
+
+- **TencentDB-Agent-Memory** — the L0→L3 hierarchical memory model,
+  versioned skill library, wiki + link graph, and code symbol graph
+  concepts are direct adaptations of their architecture.
+- **worldmonitor** — the world intelligence module (news, markets, CII)
+  and the MCP integration pattern are direct adaptations of their
+  dashboard and CLI.
+
+Both are credited in the corresponding module docs and in the README.
+
+---
+
 ## [1.6.0] — 2026-08-21 — Singularity Upgrade
 
 The single biggest feature drop in Aegis AI history. Five new backend

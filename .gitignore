@@ -45,6 +45,11 @@ logs/
 *.dmg
 *.AppImage
 *.deb
+/release-artifacts/
 
 # Tauri icons cache
 /src-tauri/icons/.cache/
+
+# Reference repos cloned during development
+/tencent-memory/
+/worldmonitor/

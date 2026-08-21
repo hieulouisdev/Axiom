@@ -47,6 +47,7 @@ pub mod config;
 pub mod error;
 pub mod i18n;
 pub mod intelligence;
+pub mod mcp;
 pub mod memory;
 pub mod modes;
 pub mod security;
@@ -54,6 +55,7 @@ pub mod state;
 pub mod tasks;
 pub mod voice;
 pub mod workflow;
+pub mod world;
 
 use std::sync::Arc;
 

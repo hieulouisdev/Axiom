@@ -1,0 +1,68 @@
+[package]
+name = "aegis-cli"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+description = "Aegis AI CLI — beautiful TUI for the secure cross-platform AI assistant"
+repository = { workspace = true }
+homepage = { workspace = true }
+
+[[bin]]
+name = "aegis"
+path = "src/main.rs"
+
+[dependencies]
+# Async + serialization
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# HTTP client — use rustls with ring (pure-Rust crypto, no C deps).
+# This avoids pulling in aws-lc-sys, which needs a C cross-compiler.
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider", "stream", "multipart", "query"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+
+# Database
+rusqlite = { workspace = true }
+
+# Time / UUID
+time = { workspace = true }
+uuid = { workspace = true }
+
+# Hashing
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+# Config / dirs
+directories = { workspace = true }
+dirs = { workspace = true }
+toml = { workspace = true }
+
+# TUI
+ratatui = "0.29"
+crossterm = "0.28"
+
+# CLI parsing
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# Misc
+parking_lot = "0.12"
+async-trait = "0.1"
+futures = "0.3"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+regex = "1.13"
+url = "2.5"
+base64 = "0.23"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
